@@ -1,14 +1,14 @@
 # ninja log v6
+1838	2211	7474445403841524	esp-idf/lwip/CMakeFiles/__idf_lwip.dir/lwip/src/core/memp.c.obj	e91498b14de1c193
+13883	14268	7474445524288350	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/C_/Espressif/frameworks/esp-idf-v5.2.1/components/mbedtls/port/bignum/esp_bignum.c.obj	278b7edf0e5d136c
+11766	12175	7474445503128399	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/aria.c.obj	4850ece7786950a8
+130	514	7474445327611793	esp-idf/esp_http_server/CMakeFiles/__idf_esp_http_server.dir/src/util/ctrl_sock.c.obj	cba3adae5209dc10
 4404	5126	7474445429506333	esp-idf/nvs_flash/CMakeFiles/__idf_nvs_flash.dir/src/nvs_partition.cpp.obj	5038e4286d3e2949
 74	105	7474445327310873	project_elf_src_esp32c6.c	a3dc5f7bd0d86703
 15486	15858	7474445540326044	esp-idf/driver/CMakeFiles/__idf_driver.dir/gpio/gpio_etm.c.obj	6a404a0a11da5d26
-130	514	7474445327611793	esp-idf/esp_http_server/CMakeFiles/__idf_esp_http_server.dir/src/util/ctrl_sock.c.obj	cba3adae5209dc10
-13883	14268	7474445524288350	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/C_/Espressif/frameworks/esp-idf-v5.2.1/components/mbedtls/port/bignum/esp_bignum.c.obj	278b7edf0e5d136c
-11766	12175	7474445503128399	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/aria.c.obj	4850ece7786950a8
-1838	2211	7474445403841524	esp-idf/lwip/CMakeFiles/__idf_lwip.dir/lwip/src/core/memp.c.obj	e91498b14de1c193
-17523	17970	7474445560690495	esp-idf/esp_ringbuf/CMakeFiles/__idf_esp_ringbuf.dir/ringbuf.c.obj	6df78a163b7ff082
-67	105	7474445327310873	C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/build/esp-idf/esp_system/ld/memory.ld	b4f7b425a12fa139
 9940	10115	7474445484874727	esp-idf/spi_flash/CMakeFiles/__idf_spi_flash.dir/spi_flash_chip_drivers.c.obj	6a92f7ccb5f915a6
+67	105	7474445327310873	C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/build/esp-idf/esp_system/ld/memory.ld	b4f7b425a12fa139
+17523	17970	7474445560690495	esp-idf/esp_ringbuf/CMakeFiles/__idf_esp_ringbuf.dir/ringbuf.c.obj	6df78a163b7ff082
 123	483	7474445327541455	esp-idf/esp_http_server/CMakeFiles/__idf_esp_http_server.dir/src/httpd_uri.c.obj	9ee5ea8c7f944eaa
 6302	6502	7474445448474118	esp-idf/newlib/CMakeFiles/__idf_newlib.dir/sysconf.c.obj	a0ca9706d0d1087f
 1159	1526	7474445337906670	esp-idf/esp_wifi/CMakeFiles/__idf_esp_wifi.dir/src/wifi_init.c.obj	ae7092e6c8a8195f

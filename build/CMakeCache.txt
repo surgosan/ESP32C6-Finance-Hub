@@ -14,9 +14,6 @@
 # EXTERNAL cache entries
 ########################
 
-//Build shared libraries
-BUILD_SHARED_LIBS:BOOL=OFF
-
 //Path to a program.
 CMAKE_ADDR2LINE:FILEPATH=C:/Espressif/tools/riscv32-esp-elf/esp-13.2.0_20230928/riscv32-esp-elf/bin/riscv32-esp-elf-addr2line.exe
 
@@ -325,12 +322,6 @@ LINK_WITH_PTHREAD:BOOL=OFF
 //Explicitly link Mbed TLS library to trusted_storage.
 LINK_WITH_TRUSTED_STORAGE:BOOL=OFF
 
-//Use #include "lv_conf.h" instead of #include "../../lv_conf.h"
-LV_CONF_INCLUDE_SIMPLE:BOOL=ON
-
-//Use #include "lvgl.h" instead of #include "../../lvgl.h"
-LV_LVGL_H_INCLUDE_SIMPLE:BOOL=ON
-
 //Mbed TLS config file (overrides default).
 MBEDTLS_CONFIG_FILE:FILEPATH=
 
@@ -369,15 +360,6 @@ esp-idf_SOURCE_DIR:STATIC=C:/Espressif/frameworks/esp-idf-v5.2.1
 
 //Dependencies for the target
 everest_LIB_DEPENDS:STATIC=general;__idf_cxx;general;__idf_newlib;general;__idf_freertos;general;__idf_esp_hw_support;general;__idf_heap;general;__idf_log;general;__idf_soc;general;__idf_hal;general;__idf_esp_rom;general;__idf_esp_common;general;__idf_esp_system;general;__idf_riscv;
-
-//Value Computed by CMake
-lvgl_BINARY_DIR:STATIC=C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/build/lib/lvgl
-
-//Value Computed by CMake
-lvgl_IS_TOP_LEVEL:STATIC=OFF
-
-//Value Computed by CMake
-lvgl_SOURCE_DIR:STATIC=C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/lib/lvgl
 
 //Dependencies for the target
 mbedcrypto_LIB_DEPENDS:STATIC=general;__idf_cxx;general;__idf_newlib;general;__idf_freertos;general;__idf_esp_hw_support;general;__idf_heap;general;__idf_log;general;__idf_soc;general;__idf_hal;general;__idf_esp_rom;general;__idf_esp_common;general;__idf_esp_system;general;__idf_riscv;general;everest;general;p256m;

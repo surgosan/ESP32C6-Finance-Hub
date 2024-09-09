@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.29)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(ESP32C6_Finance_Hub)
 
-# Include LVGL
-set(LVGL_DIR ${CMAKE_SOURCE_DIR}/lib/lvgl)
-add_subdirectory(${LVGL_DIR})
+set(EXTRA_COMPONENT_DIRS
+        ${CMAKE_SOURCE_DIR}/components/TFT_eSPI
+        ${CMAKE_SOURCE_DIR}/components/lvgl
+)
