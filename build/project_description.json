@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "ESP32C6_Finance_Hub",
-    "project_version":    "6d37fd5-dirty",
+    "project_version":    "417453b-dirty",
     "project_path":       "C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub",
     "idf_path":           "C:/Espressif/frameworks/esp-idf-v5.2.1",
     "build_dir":          "C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/build",
