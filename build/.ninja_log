@@ -1,14 +1,14 @@
 # ninja log v6
+4163	4499	7477057853734609	esp-idf/lwip/CMakeFiles/__idf_lwip.dir/lwip/src/core/memp.c.obj	e91498b14de1c193
+14228	14542	7477057954382694	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/C_/Espressif/frameworks/esp-idf-v5.2.1/components/mbedtls/port/bignum/esp_bignum.c.obj	278b7edf0e5d136c
+12520	12873	7477057937306185	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/aria.c.obj	4850ece7786950a8
+138	442	7477057813481121	esp-idf/esp_http_server/CMakeFiles/__idf_esp_http_server.dir/src/util/ctrl_sock.c.obj	cba3adae5209dc10
 6223	6803	7477057874336046	esp-idf/nvs_flash/CMakeFiles/__idf_nvs_flash.dir/src/nvs_partition.cpp.obj	5038e4286d3e2949
 78	107	7477057813122735	project_elf_src_esp32c6.c	a3dc5f7bd0d86703
 15712	16063	7477057969221805	esp-idf/driver/CMakeFiles/__idf_driver.dir/gpio/gpio_etm.c.obj	6a404a0a11da5d26
-138	442	7477057813481121	esp-idf/esp_http_server/CMakeFiles/__idf_esp_http_server.dir/src/util/ctrl_sock.c.obj	cba3adae5209dc10
-14228	14542	7477057954382694	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/C_/Espressif/frameworks/esp-idf-v5.2.1/components/mbedtls/port/bignum/esp_bignum.c.obj	278b7edf0e5d136c
-12520	12873	7477057937306185	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/aria.c.obj	4850ece7786950a8
-4163	4499	7477057853734609	esp-idf/lwip/CMakeFiles/__idf_lwip.dir/lwip/src/core/memp.c.obj	e91498b14de1c193
-17424	17836	7477057986341021	esp-idf/esp_ringbuf/CMakeFiles/__idf_esp_ringbuf.dir/ringbuf.c.obj	6df78a163b7ff082
-72	113	7477057813173747	C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/build/esp-idf/esp_system/ld/memory.ld	b4f7b425a12fa139
 11045	11197	7477057922552885	esp-idf/spi_flash/CMakeFiles/__idf_spi_flash.dir/spi_flash_chip_drivers.c.obj	6a92f7ccb5f915a6
+72	113	7477057813173747	C:/Users/sergy/CLionProjects/ESP32C6 Finance Hub/build/esp-idf/esp_system/ld/memory.ld	b4f7b425a12fa139
+17424	17836	7477057986341021	esp-idf/esp_ringbuf/CMakeFiles/__idf_esp_ringbuf.dir/ringbuf.c.obj	6df78a163b7ff082
 10937	11098	7477057921480142	esp-idf/esp_system/CMakeFiles/__idf_esp_system.dir/port/soc/esp32c6/cache_err_int.c.obj	7a3c45e9103c0643
 150	406	7477057813604289	esp-idf/esp_http_client/CMakeFiles/__idf_esp_http_client.dir/lib/http_header.c.obj	bad5981079350a43
 12985	13535	7477057941953296	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/ecp_curves.c.obj	759228dab446aabe
@@ -509,9 +509,9 @@
 12643	12803	7477057938536713	esp-idf/mbedtls/mbedtls/library/CMakeFiles/mbedcrypto.dir/bignum_mod.c.obj	3c3a762700f98816
 6317	7728	7477057875270473	esp-idf/nvs_flash/CMakeFiles/__idf_nvs_flash.dir/src/nvs_encrypted_partition.cpp.obj	de1f1651ecfa3c3b
 7568	7775	7477057887779563	esp-idf/newlib/CMakeFiles/__idf_newlib.dir/locks.c.obj	44b8ce7a2c008adc
-10240	10449	7477057914497915	esp-idf/hal/CMakeFiles/__idf_hal.dir/hmac_hal.c.obj	ae5474e922b43403
 7635	7792	7477057888454674	esp-idf/newlib/CMakeFiles/__idf_newlib.dir/pthread.c.obj	b8de3f558ba5f261
 9534	9642	7477057907437562	esp-idf/heap/CMakeFiles/__idf_heap.dir/port/esp32c6/memory_layout.c.obj	bd8dd2994b0395f4
+10240	10449	7477057914497915	esp-idf/hal/CMakeFiles/__idf_hal.dir/hmac_hal.c.obj	ae5474e922b43403
 7647	7818	7477057888574764	esp-idf/newlib/CMakeFiles/__idf_newlib.dir/random.c.obj	c870571496454367
 8695	8797	7477057899045958	esp-idf/esp_hw_support/CMakeFiles/__idf_esp_hw_support.dir/port/esp32c6/systimer.c.obj	ace4f2b2379e7ba0
 6253	7831	7477057874627173	esp-idf/nvs_flash/CMakeFiles/__idf_nvs_flash.dir/src/nvs_partition_manager.cpp.obj	d7ed2d1ff7cd7885
