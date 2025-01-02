@@ -39,7 +39,7 @@
  * Data format for compressed image data.
  */
 
-typedef struct lv_image_compressed_t {
+typedef struct _lv_image_compressed_t {
     uint32_t method: 4; /*Compression method, see `lv_image_compress_t`*/
     uint32_t reserved : 28;  /*Reserved to be used later*/
     uint32_t compressed_size;  /*Compressed data size in byte*/
@@ -275,13 +275,20 @@ lv_result_t lv_bin_decoder_open(lv_image_decoder_t * decoder, lv_image_decoder_d
             }
         }
         else if(LV_COLOR_FORMAT_IS_ALPHA_ONLY(cf)) {
-            /*Alpha only image will need decoder data to store pointer to decoded image, to free it when decoder closes*/
-            decoder_data_t * decoder_data = get_decoder_data(dsc);
-            if(decoder_data == NULL) {
-                return LV_RESULT_INVALID;
+            if(cf == LV_COLOR_FORMAT_A8) {
+                res = LV_RESULT_OK;
+                use_directly = true;
+                dsc->decoded = (lv_draw_buf_t *)image;
             }
+            else {
+                /*Alpha only image will need decoder data to store pointer to decoded image, to free it when decoder closes*/
+                decoder_data_t * decoder_data = get_decoder_data(dsc);
+                if(decoder_data == NULL) {
+                    return LV_RESULT_INVALID;
+                }
 
-            res = decode_alpha_only(decoder, dsc);
+                res = decode_alpha_only(decoder, dsc);
+            }
         }
         else {
             /*In case of uncompressed formats the image stored in the ROM/RAM.
@@ -324,6 +331,10 @@ lv_result_t lv_bin_decoder_open(lv_image_decoder_t * decoder, lv_image_decoder_d
     if(dsc->decoded == NULL) return LV_RESULT_OK; /*Need to read via get_area_cb*/
 
     lv_draw_buf_t * decoded = (lv_draw_buf_t *)dsc->decoded;
+    if(dsc->header.flags & LV_IMAGE_FLAGS_PREMULTIPLIED) {
+        lv_draw_buf_set_flag(decoded, LV_IMAGE_FLAGS_PREMULTIPLIED);
+    }
+
     lv_draw_buf_t * adjusted = lv_image_decoder_post_process(dsc, decoded);
     if(adjusted == NULL) {
         free_decoder_data(dsc);

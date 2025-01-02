@@ -33,6 +33,7 @@ typedef struct {
     lv_draw_dsc_base_t base;
 
     const char * text;
+    uint32_t text_length;
     const lv_font_t * font;
     uint32_t sel_start;
     uint32_t sel_end;
@@ -53,6 +54,11 @@ typedef struct {
      * < 1: malloc buffer and copy `text` there.
      * 0: `text` is const and it's pointer will be valid during rendering.*/
     uint8_t text_local : 1;
+
+    /**
+     * Indicate that the text is constant and its pointer can be safely saved e.g. in a cache.
+     */
+    uint8_t text_static : 1;
     lv_draw_label_hint_t * hint;
 } lv_draw_label_dsc_t;
 
@@ -96,7 +102,7 @@ lv_draw_label_dsc_t * lv_draw_task_get_label_dsc(lv_draw_task_t * task);
 void lv_draw_glyph_dsc_init(lv_draw_glyph_dsc_t * dsc);
 
 /**
- * Crate a draw task to render a text
+ * Create a draw task to render a text
  * @param layer         pointer to a layer
  * @param dsc           pointer to draw descriptor
  * @param coords        coordinates of the character
@@ -105,7 +111,7 @@ void /* LV_ATTRIBUTE_FAST_MEM */ lv_draw_label(lv_layer_t * layer, const lv_draw
                                                const lv_area_t * coords);
 
 /**
- * Crate a draw task to render a single character
+ * Create a draw task to render a single character
  * @param layer          pointer to a layer
  * @param dsc            pointer to draw descriptor
  * @param point          position of the label

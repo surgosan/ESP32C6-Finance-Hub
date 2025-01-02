@@ -60,7 +60,7 @@ void lv_draw_vg_lite_border(lv_draw_unit_t * draw_unit, const lv_draw_border_dsc
         return;
     }
 
-    LV_PROFILER_BEGIN;
+    LV_PROFILER_DRAW_BEGIN;
 
     int32_t w = lv_area_get_width(coords);
     int32_t h = lv_area_get_height(coords);
@@ -72,7 +72,7 @@ void lv_draw_vg_lite_border(lv_draw_unit_t * draw_unit, const lv_draw_border_dsc
 
     lv_vg_lite_path_t * path = lv_vg_lite_path_get(u, VG_LITE_FP32);
     lv_vg_lite_path_set_quality(path, dsc->radius == 0 ? VG_LITE_LOW : VG_LITE_HIGH);
-    lv_vg_lite_path_set_bonding_box_area(path, &clip_area);
+    lv_vg_lite_path_set_bounding_box_area(path, &clip_area);
 
     /* outer rect */
     lv_vg_lite_path_append_rect(path,
@@ -85,9 +85,7 @@ void lv_draw_vg_lite_border(lv_draw_unit_t * draw_unit, const lv_draw_border_dsc
 
     lv_vg_lite_path_end(path);
 
-    vg_lite_matrix_t matrix;
-    vg_lite_identity(&matrix);
-    lv_vg_lite_matrix_multiply(&matrix, &u->global_matrix);
+    vg_lite_matrix_t matrix = u->global_matrix;
 
     vg_lite_color_t color = lv_vg_lite_color(dsc->color, dsc->opa, true);
 
@@ -97,7 +95,7 @@ void lv_draw_vg_lite_border(lv_draw_unit_t * draw_unit, const lv_draw_border_dsc
     LV_VG_LITE_ASSERT_PATH(vg_lite_path);
     LV_VG_LITE_ASSERT_MATRIX(&matrix);
 
-    LV_PROFILER_BEGIN_TAG("vg_lite_draw");
+    LV_PROFILER_DRAW_BEGIN_TAG("vg_lite_draw");
     LV_VG_LITE_CHECK_ERROR(vg_lite_draw(
                                &u->target_buffer,
                                vg_lite_path,
@@ -105,10 +103,10 @@ void lv_draw_vg_lite_border(lv_draw_unit_t * draw_unit, const lv_draw_border_dsc
                                &matrix,
                                VG_LITE_BLEND_SRC_OVER,
                                color));
-    LV_PROFILER_END_TAG("vg_lite_draw");
+    LV_PROFILER_DRAW_END_TAG("vg_lite_draw");
 
     lv_vg_lite_path_drop(u, path);
-    LV_PROFILER_END;
+    LV_PROFILER_DRAW_END;
 }
 
 /**********************
@@ -120,7 +118,7 @@ static vg_lite_fill_t path_append_inner_rect(lv_vg_lite_path_t * path,
                                              int32_t x, int32_t y, int32_t w, int32_t h,
                                              float r)
 {
-    LV_PROFILER_BEGIN;
+    LV_PROFILER_DRAW_BEGIN;
 
     const float half_w = w / 2.0f;
     const float half_h = h / 2.0f;
@@ -129,7 +127,7 @@ static vg_lite_fill_t path_append_inner_rect(lv_vg_lite_path_t * path,
 
     /* normal fill, no inner rect */
     if(border_w >= border_w_max) {
-        LV_PROFILER_END;
+        LV_PROFILER_DRAW_END;
         return VG_LITE_FILL_EVEN_ODD;
     }
 
@@ -141,7 +139,7 @@ static vg_lite_fill_t path_append_inner_rect(lv_vg_lite_path_t * path,
                                     x + border_w, y + border_w,
                                     w - border_w * 2, h - border_w * 2,
                                     r_in < 0 ? 0 : r_in);
-        LV_PROFILER_END;
+        LV_PROFILER_DRAW_END;
         return VG_LITE_FILL_EVEN_ODD;
     }
 
@@ -173,13 +171,12 @@ static vg_lite_fill_t path_append_inner_rect(lv_vg_lite_path_t * path,
                                     w_inner,
                                     h_inner,
                                     0);
-        LV_PROFILER_END;
+        LV_PROFILER_DRAW_END;
         return VG_LITE_FILL_EVEN_ODD;
     }
 
     /* reset outter rect path */
     lv_vg_lite_path_reset(path, VG_LITE_FP32);
-    lv_vg_lite_path_set_quality(path, VG_LITE_HIGH);
 
     /* coordinate reference map: https://github.com/lvgl/lvgl/pull/6796 */
     const float c1_x = x + r;
@@ -269,7 +266,7 @@ static vg_lite_fill_t path_append_inner_rect(lv_vg_lite_path_t * path,
             lv_vg_lite_path_close(path);
         }
 
-        LV_PROFILER_END;
+        LV_PROFILER_DRAW_END;
         return VG_LITE_FILL_NON_ZERO;
     }
 
@@ -396,7 +393,7 @@ static vg_lite_fill_t path_append_inner_rect(lv_vg_lite_path_t * path,
         lv_vg_lite_path_close(path);
     }
 
-    LV_PROFILER_END;
+    LV_PROFILER_DRAW_END;
     return VG_LITE_FILL_NON_ZERO;
 }
 

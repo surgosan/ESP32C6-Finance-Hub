@@ -96,7 +96,7 @@ lv_draw_box_shadow_dsc_t * lv_draw_task_get_box_shadow_dsc(lv_draw_task_t * task
 void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_area_t * coords)
 {
 
-    LV_PROFILER_BEGIN;
+    LV_PROFILER_DRAW_BEGIN;
     bool has_shadow;
     bool has_fill;
     bool has_border;
@@ -147,6 +147,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
         /*Check whether the shadow is visible*/
         t = lv_draw_add_task(layer, coords);
         lv_draw_box_shadow_dsc_t * shadow_dsc = lv_malloc(sizeof(lv_draw_box_shadow_dsc_t));
+        LV_ASSERT_MALLOC(shadow_dsc);
         t->draw_dsc = shadow_dsc;
         lv_area_increase(&t->_real_area, dsc->shadow_spread, dsc->shadow_spread);
         lv_area_increase(&t->_real_area, dsc->shadow_width, dsc->shadow_width);
@@ -178,6 +179,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
 
         t = lv_draw_add_task(layer, &bg_coords);
         lv_draw_fill_dsc_t * bg_dsc = lv_malloc(sizeof(lv_draw_fill_dsc_t));
+        LV_ASSERT_MALLOC(bg_dsc);
         lv_draw_fill_dsc_init(bg_dsc);
         t->draw_dsc = bg_dsc;
         bg_dsc->base = dsc->base;
@@ -199,11 +201,12 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
         if(src_type == LV_IMAGE_SRC_VARIABLE || src_type == LV_IMAGE_SRC_FILE) {
             res  = lv_image_decoder_get_info(dsc->bg_image_src, &header);
         }
-        else if(src_type == LV_IMAGE_SRC_UNKNOWN) {
-            res = LV_RESULT_INVALID;
-        }
         else {
             lv_memzero(&header, sizeof(header));
+
+            if(src_type == LV_IMAGE_SRC_UNKNOWN) {
+                res = LV_RESULT_INVALID;
+            }
         }
 
         if(res == LV_RESULT_OK) {
@@ -219,6 +222,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
                 }
 
                 lv_draw_image_dsc_t * bg_image_dsc = lv_malloc(sizeof(lv_draw_image_dsc_t));
+                LV_ASSERT_MALLOC(bg_image_dsc);
                 lv_draw_image_dsc_init(bg_image_dsc);
                 t->draw_dsc = bg_image_dsc;
                 bg_image_dsc->base = dsc->base;
@@ -230,6 +234,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
                 bg_image_dsc->tile = dsc->bg_image_tiled;
                 bg_image_dsc->header = header;
                 bg_image_dsc->clip_radius = dsc->radius;
+                bg_image_dsc->image_area = *coords;
                 t->type = LV_DRAW_TASK_TYPE_IMAGE;
                 lv_draw_finalize_task_creation(layer, t);
             }
@@ -242,6 +247,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
                 t = lv_draw_add_task(layer, &a);
 
                 lv_draw_label_dsc_t * bg_label_dsc = lv_malloc(sizeof(lv_draw_label_dsc_t));
+                LV_ASSERT_MALLOC(bg_label_dsc);
                 lv_draw_label_dsc_init(bg_label_dsc);
                 t->draw_dsc = bg_label_dsc;
                 bg_label_dsc->base = dsc->base;
@@ -259,6 +265,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
     if(has_border) {
         t = lv_draw_add_task(layer, coords);
         lv_draw_border_dsc_t * border_dsc = lv_malloc(sizeof(lv_draw_border_dsc_t));
+        LV_ASSERT_MALLOC(border_dsc);
         t->draw_dsc = border_dsc;
         border_dsc->base = dsc->base;
         border_dsc->base.dsc_size = sizeof(lv_draw_border_dsc_t);
@@ -277,6 +284,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
         lv_area_increase(&outline_coords, dsc->outline_width + dsc->outline_pad, dsc->outline_width + dsc->outline_pad);
         t = lv_draw_add_task(layer, &outline_coords);
         lv_draw_border_dsc_t * outline_dsc = lv_malloc(sizeof(lv_draw_border_dsc_t));
+        LV_ASSERT_MALLOC(outline_dsc);
         t->draw_dsc = outline_dsc;
         lv_area_increase(&t->_real_area, dsc->outline_width, dsc->outline_width);
         lv_area_increase(&t->_real_area, dsc->outline_pad, dsc->outline_pad);
@@ -294,7 +302,7 @@ void lv_draw_rect(lv_layer_t * layer, const lv_draw_rect_dsc_t * dsc, const lv_a
 
     LV_ASSERT_MEM_INTEGRITY();
 
-    LV_PROFILER_END;
+    LV_PROFILER_DRAW_END;
 }
 
 /**********************

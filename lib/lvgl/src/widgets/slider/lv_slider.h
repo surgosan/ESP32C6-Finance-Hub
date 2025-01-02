@@ -35,8 +35,27 @@ typedef enum {
     LV_SLIDER_MODE_RANGE = LV_BAR_MODE_RANGE
 } lv_slider_mode_t;
 
+typedef enum {
+    LV_SLIDER_ORIENTATION_AUTO = LV_BAR_ORIENTATION_AUTO,
+    LV_SLIDER_ORIENTATION_HORIZONTAL = LV_BAR_ORIENTATION_HORIZONTAL,
+    LV_SLIDER_ORIENTATION_VERTICAL = LV_BAR_ORIENTATION_VERTICAL
+} lv_slider_orientation_t;
+
 LV_ATTRIBUTE_EXTERN_DATA extern const lv_obj_class_t lv_slider_class;
 
+#if LV_USE_OBJ_PROPERTY
+enum {
+    LV_PROPERTY_ID2(SLIDER, VALUE,          LV_PROPERTY_TYPE_INT,   LV_PROPERTY_TYPE_BOOL,  0),
+    LV_PROPERTY_ID2(SLIDER, LEFT_VALUE,     LV_PROPERTY_TYPE_INT,   LV_PROPERTY_TYPE_BOOL,  1),
+    LV_PROPERTY_ID2(SLIDER, RANGE,          LV_PROPERTY_TYPE_INT,   LV_PROPERTY_TYPE_INT,   2),
+    LV_PROPERTY_ID(SLIDER, MIN_VALUE,       LV_PROPERTY_TYPE_INT,       4),
+    LV_PROPERTY_ID(SLIDER, MAX_VALUE,       LV_PROPERTY_TYPE_INT,       5),
+    LV_PROPERTY_ID(SLIDER, MODE,            LV_PROPERTY_TYPE_INT,       6),
+    LV_PROPERTY_ID(SLIDER, IS_DRAGGED,      LV_PROPERTY_TYPE_BOOL,      7),
+    LV_PROPERTY_ID(SLIDER, IS_SYMMETRICAL,  LV_PROPERTY_TYPE_BOOL,      8),
+    LV_PROPERTY_SLIDER_END,
+};
+#endif
 /**********************
  * GLOBAL PROTOTYPES
  **********************/
@@ -79,9 +98,16 @@ void lv_slider_set_range(lv_obj_t * obj, int32_t min, int32_t max);
 /**
  * Set the mode of slider.
  * @param obj       pointer to a slider object
- * @param mode      the mode of the slider. See ::lv_slider_mode_t
+ * @param mode      the mode of the slider. See `lv_slider_mode_t`
  */
 void lv_slider_set_mode(lv_obj_t * obj, lv_slider_mode_t mode);
+
+/**
+ * Set the orientation of slider.
+ * @param obj           pointer to a slider object
+ * @param orientation   slider  orientation from `lv_slider_orientation_t`
+ */
+void lv_slider_set_orientation(lv_obj_t * obj, lv_slider_orientation_t orientation);
 
 /*=====================
  * Getter functions
@@ -125,9 +151,16 @@ bool lv_slider_is_dragged(const lv_obj_t * obj);
 /**
  * Get the mode of the slider.
  * @param slider       pointer to a slider object
- * @return          see ::lv_slider_mode_t
+ * @return          see `lv_slider_mode_t`
  */
 lv_slider_mode_t lv_slider_get_mode(lv_obj_t * slider);
+
+/**
+ * Get the orientation of slider.
+ * @param obj       pointer to a slider object
+ * @return          slider orientation from `lv_slider_orientation_t`
+ */
+lv_slider_orientation_t lv_slider_get_orientation(lv_obj_t * slider);
 
 /**
  * Give the slider is in symmetrical mode or not

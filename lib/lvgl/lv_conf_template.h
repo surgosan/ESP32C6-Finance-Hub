@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file lv_conf.h
  * Configuration file for v9.3.0-dev
  */
@@ -105,11 +105,20 @@
  * - LV_OS_RTTHREAD
  * - LV_OS_WINDOWS
  * - LV_OS_MQX
+ * - LV_OS_SDL2
  * - LV_OS_CUSTOM */
 #define LV_USE_OS   LV_OS_NONE
 
 #if LV_USE_OS == LV_OS_CUSTOM
     #define LV_OS_CUSTOM_INCLUDE <stdint.h>
+#endif
+#if LV_USE_OS == LV_OS_FREERTOS
+	/*
+	 * Unblocking an RTOS task with a direct notification is 45% faster and uses less RAM
+	 * than unblocking a task using an intermediary object such as a binary semaphore.
+	 * RTOS task notifications can only be used when there is only one task that can be the recipient of the event.
+	 */
+	#define LV_USE_FREERTOS_TASK_NOTIFY 1
 #endif
 
 /*========================
@@ -135,6 +144,12 @@
 
 /** The target buffer size for simple layer chunks. */
 #define LV_DRAW_LAYER_SIMPLE_BUF_SIZE    (24 * 1024)    /**< [bytes]*/
+
+/* Limit the max allocated memory for simple and transformed layers.
+ * It should be at least `LV_DRAW_LAYER_SIMPLE_BUF_SIZE` sized but if transformed layers are also used
+ * it should be enough to store the largest widget too (width x height x 4 area).
+ * Set it to 0 to have no limit. */
+#define LV_DRAW_LAYER_MAX_MEMORY 0  /**< No limit by default [bytes]*/
 
 /** Stack size of drawing thread.
  * NOTE: If FreeType or ThorVG is enabled, it is recommended to set it to 32KB or more.
@@ -198,6 +213,27 @@
     #define LV_USE_DRAW_SW_COMPLEX_GRADIENTS    0
 #endif
 
+/*Use TSi's aka (Think Silicon) NemaGFX */
+#define LV_USE_NEMA_GFX 0
+
+#if LV_USE_NEMA_GFX
+    /** Select which NemaGFX HAL to use. Possible options:
+     * - LV_NEMA_HAL_CUSTOM
+     * - LV_NEMA_HAL_STM32 */
+    #define LV_USE_NEMA_HAL LV_NEMA_HAL_CUSTOM
+    #if LV_USE_NEMA_HAL == LV_NEMA_HAL_STM32
+        #define LV_NEMA_STM32_HAL_INCLUDE <stm32u5xx_hal.h>
+    #endif
+
+    /*Enable Vector Graphics Operations. Available only if NemaVG library is present*/
+    #define LV_USE_NEMA_VG 0
+    #if LV_USE_NEMA_VG
+        /*Define application's resolution used for VG related buffer allocation */
+        #define LV_NEMA_GFX_MAX_RESX 800
+        #define LV_NEMA_GFX_MAX_RESY 600
+    #endif
+#endif
+
 /** Use NXP's VG-Lite GPU on iMX RTxxx platforms. */
 #define LV_USE_DRAW_VGLITE 0
 
@@ -220,10 +256,16 @@
 #endif
 
 /** Use NXP's PXP on iMX RTxxx platforms. */
-#define LV_USE_DRAW_PXP 0
+#define LV_USE_PXP 0
 
-#if LV_USE_DRAW_PXP
-    #if LV_USE_OS
+#if LV_USE_PXP
+    /** Use PXP for drawing.*/
+    #define LV_USE_DRAW_PXP 1
+
+    /** Use PXP to rotate display.*/
+    #define LV_USE_ROTATE_PXP 0
+
+    #if LV_USE_DRAW_PXP && LV_USE_OS
         /** Use additional draw thread for PXP processing.*/
         #define LV_USE_PXP_DRAW_THREAD 1
     #endif
@@ -263,6 +305,21 @@
     /** VG-Lite stroke maximum cache number. */
     #define LV_VG_LITE_STROKE_CACHE_CNT 32
 #endif
+
+/** Accelerate blends, fills, etc. with STM32 DMA2D */
+#define LV_USE_DRAW_DMA2D 0
+
+#if LV_USE_DRAW_DMA2D
+    #define LV_DRAW_DMA2D_HAL_INCLUDE "stm32h7xx_hal.h"
+
+    /* if enabled, the user is required to call `lv_draw_dma2d_transfer_complete_interrupt_handler`
+     * upon receiving the DMA2D global interrupt
+     */
+    #define LV_USE_DRAW_DMA2D_INTERRUPT 0
+#endif
+
+/** Draw using cached OpenGLES textures */
+#define LV_USE_DRAW_OPENGLES 0
 
 /*=======================
  * FEATURE CONFIGURATION
@@ -425,6 +482,10 @@
     #define LV_VG_LITE_THORVG_THREAD_RENDER 0
 #endif
 
+/* Enable the multi-touch gesture recognition feature */
+/* Gesture recognition requires the use of floats */
+#define LV_USE_GESTURE_RECOGNITION 0
+
 /*=====================
  *  COMPILER SETTINGS
  *====================*/
@@ -580,6 +641,9 @@
 /** Enable Arabic/Persian processing
  *  In these languages characters should be replaced with another form based on their position in the text */
 #define LV_USE_ARABIC_PERSIAN_CHARS 0
+
+/*The control character to use for signaling text recoloring*/
+#define LV_TXT_COLOR_CMD "#"
 
 /*==================
  * WIDGETS
@@ -757,6 +821,7 @@
 #define LV_USE_FS_FATFS 0
 #if LV_USE_FS_FATFS
     #define LV_FS_FATFS_LETTER '\0'     /**< Set an upper cased letter on which the drive will accessible (e.g. 'A') */
+    #define LV_FS_FATFS_PATH ""         /**< Set the working directory. File/directory paths will be appended to it. */
     #define LV_FS_FATFS_CACHE_SIZE 0    /**< >0 to cache this number of bytes in lv_fs_read() */
 #endif
 
@@ -770,18 +835,21 @@
 #define LV_USE_FS_LITTLEFS 0
 #if LV_USE_FS_LITTLEFS
     #define LV_FS_LITTLEFS_LETTER '\0'  /**< Set an upper cased letter on which the drive will accessible (e.g. 'A') */
+    #define LV_FS_LITTLEFS_PATH ""         /**< Set the working directory. File/directory paths will be appended to it. */
 #endif
 
 /** API for Arduino LittleFs. */
 #define LV_USE_FS_ARDUINO_ESP_LITTLEFS 0
 #if LV_USE_FS_ARDUINO_ESP_LITTLEFS
     #define LV_FS_ARDUINO_ESP_LITTLEFS_LETTER '\0'     /**< Set an upper cased letter on which the drive will accessible (e.g. 'A') */
+    #define LV_FS_ARDUINO_ESP_LITTLEFS_PATH ""         /**< Set the working directory. File/directory paths will be appended to it. */
 #endif
 
 /** API for Arduino Sd. */
 #define LV_USE_FS_ARDUINO_SD 0
 #if LV_USE_FS_ARDUINO_SD
     #define LV_FS_ARDUINO_SD_LETTER '\0'          /**< Set an upper cased letter on which the drive will accessible (e.g. 'A') */
+    #define LV_FS_ARDUINO_SD_PATH ""         /**< Set the working directory. File/directory paths will be appended to it. */
 #endif
 
 /** LODEPNG decoder library */
@@ -803,7 +871,7 @@
 
 /** GIF decoder library */
 #define LV_USE_GIF 0
-    #if LV_USE_GIF
+#if LV_USE_GIF
     /** GIF decoder accelerate */
     #define LV_GIF_CACHE_DECODE_DATA 0
 #endif
@@ -859,12 +927,22 @@
 /** Use external LZ4 library */
 #define LV_USE_LZ4_EXTERNAL  0
 
+/*SVG library
+ *  - Requires `LV_USE_VECTOR_GRAPHIC = 1` */
+#define LV_USE_SVG 0
+#define LV_USE_SVG_ANIMATION 0
+#define LV_USE_SVG_DEBUG 0
+
 /** FFmpeg library for image decoding and playing videos.
  *  Supports all major image formats so do not enable other image decoder with it. */
 #define LV_USE_FFMPEG 0
 #if LV_USE_FFMPEG
     /** Dump input information to stderr */
     #define LV_FFMPEG_DUMP_FORMAT 0
+    /** Use lvgl file path in FFmpeg Player widget 
+     *  You won't be able to open URLs after enabling this feature.
+     *  Note that FFmpeg image decoder will always use lvgl file system. */
+    #define LV_FFMPEG_PLAYER_USE_LV_FS 0
 #endif
 
 /*==================
@@ -924,6 +1002,39 @@
 
     /** Profiler end point function with custom tag */
     #define LV_PROFILER_END_TAG   LV_PROFILER_BUILTIN_END_TAG
+
+    /*Enable layout profiler*/
+    #define LV_PROFILER_LAYOUT 1
+
+    /*Enable disp refr profiler*/
+    #define LV_PROFILER_REFR 1
+
+    /*Enable draw profiler*/
+    #define LV_PROFILER_DRAW 1
+
+    /*Enable indev profiler*/
+    #define LV_PROFILER_INDEV 1
+
+    /*Enable decoder profiler*/
+    #define LV_PROFILER_DECODER 1
+
+    /*Enable font profiler*/
+    #define LV_PROFILER_FONT 1
+
+    /*Enable fs profiler*/
+    #define LV_PROFILER_FS 1
+
+    /*Enable style profiler*/
+    #define LV_PROFILER_STYLE 0
+
+    /*Enable timer profiler*/
+    #define LV_PROFILER_TIMER 1
+
+    /*Enable cache profiler*/
+    #define LV_PROFILER_CACHE 1
+
+    /*Enable event profiler*/
+    #define LV_PROFILER_EVENT 1
 #endif
 
 /** 1: Enable Monkey test */
@@ -970,15 +1081,18 @@
     #define LV_FILE_EXPLORER_QUICK_ACCESS        1
 #endif
 
-/*1: Enable freetype font manager*/
-/*Requires: LV_USE_FREETYPE*/
+/** 1: Enable freetype font manager
+ *  - Requires: LV_USE_FREETYPE */
 #define LV_USE_FONT_MANAGER                     0
 #if LV_USE_FONT_MANAGER
 
-/*Font manager name max length*/
+/**Font manager name max length*/
 #define LV_FONT_MANAGER_NAME_MAX_LEN            32
 
 #endif
+
+/** Enable loading XML UIs runtime */
+#define LV_USE_XML	0
 
 /*==================
  * DEVICES
@@ -1027,6 +1141,8 @@
 #define LV_USE_NUTTX    0
 
 #if LV_USE_NUTTX
+    #define LV_USE_NUTTX_INDEPENDENT_IMAGE_HEAP 0
+
     #define LV_USE_NUTTX_LIBUV    0
 
     /** Use Nuttx custom init API to open window and handle touchscreen */
@@ -1041,6 +1157,9 @@
 
     /** Driver for /dev/input */
     #define LV_USE_NUTTX_TOUCHSCREEN    0
+
+    /*Touchscreen cursor size in pixels(<=0: disable cursor)*/
+    #define LV_NUTTX_TOUCHSCREEN_CURSOR_SIZE    0
 #endif
 
 /** Driver for /dev/dri/card */
@@ -1076,6 +1195,13 @@
 
 /** Driver for Renesas GLCD */
 #define LV_USE_RENESAS_GLCDC    0
+
+/** Driver for ST LTDC */
+#define LV_USE_ST_LTDC    0
+#if LV_USE_ST_LTDC
+    /* Only used for partial. */
+    #define LV_ST_LTDC_USE_DMA2D_FLUSH 0
+#endif
 
 /** LVGL Windows backend */
 #define LV_USE_WINDOWS    0
@@ -1143,6 +1269,15 @@
 
 /** Vector graphic demo */
 #define LV_USE_DEMO_VECTOR_GRAPHIC  0
+
+/*E-bike demo with Lottie animations (if LV_USE_LOTTIE is enabled)*/
+#define LV_USE_DEMO_EBIKE			0
+#if LV_USE_DEMO_EBIKE
+	#define LV_DEMO_EBIKE_PORTRAIT  0    /*0: for 480x270..480x320, 1: for 480x800..720x1280*/
+#endif
+
+/** High-resolution demo */
+#define LV_USE_DEMO_HIGH_RES        0
 
 /*--END OF LV_CONF_H--*/
 

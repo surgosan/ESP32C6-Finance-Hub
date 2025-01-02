@@ -14,3 +14,5 @@ sphinxcontrib-mermaid
 sphinx-design
 sphinx-rtd-dark-mode
 typing-extensions
+sphinx-reredirects
+dirsync

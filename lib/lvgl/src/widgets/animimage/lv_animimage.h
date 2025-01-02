@@ -14,6 +14,7 @@ extern "C" {
  *      INCLUDES
  *********************/
 #include "../image/lv_image.h"
+#include "../../misc/lv_types.h"
 
 #if LV_USE_ANIMIMG != 0
 
@@ -29,6 +30,16 @@ extern "C" {
 /**********************
  *      TYPEDEFS
  **********************/
+
+#if LV_USE_OBJ_PROPERTY
+enum {
+    LV_PROPERTY_ID2(ANIMIMAGE, SRC,         LV_PROPERTY_TYPE_POINTER,  LV_PROPERTY_TYPE_INT,  0),
+    LV_PROPERTY_ID(ANIMIMAGE, DURATION,     LV_PROPERTY_TYPE_INT,   1),
+    LV_PROPERTY_ID(ANIMIMAGE, REPEAT_COUNT, LV_PROPERTY_TYPE_INT,   2),
+    LV_PROPERTY_ID(ANIMIMAGE, SRC_COUNT,    LV_PROPERTY_TYPE_INT,   3),
+    LV_PROPERTY_ANIMIMAGE_END,
+};
+#endif
 
 LV_ATTRIBUTE_EXTERN_DATA extern const lv_obj_class_t lv_animimg_class;
 
@@ -111,6 +122,13 @@ uint32_t lv_animimg_get_duration(lv_obj_t * img);
  * @return      the repeat count
  */
 uint32_t lv_animimg_get_repeat_count(lv_obj_t * img);
+
+/**
+ * Get the image animation underlying animation.
+ * @param img   pointer to an animation image object
+ * @return      the animation reference
+ */
+lv_anim_t * lv_animimg_get_anim(lv_obj_t * img);
 
 #endif /*LV_USE_ANIMIMG*/
 
