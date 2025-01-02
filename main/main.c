@@ -1,102 +1,134 @@
-#include <stdio.h>
-#include <string.h>
-#include <driver/spi_master.h>
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_lcd_panel_ops.h"
+#include "driver/gpio.h"
+#include "driver/spi_master.h"
+#include "esp_err.h"
+#include "esp_lcd_ili9341.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "lvgl.h"
-#include "TFT_eSPI.h"
-#include "src/drivers/display/ili9341/lv_ili9341.h"
-#include "src/drivers/display/lcd/lv_lcd_generic_mipi.h"
-#include "src/misc/lv_fs.h"
+#include <stdio.h>
 
-#define BL 15 //Manually turn off/on when needed
-#define SCK 4
-#define MISO 5
-#define MOSI 6
+#define BL 15
+#define SCK 6
+#define MISO 4
+#define MOSI 5
 #define CS 23
 #define RST 22
 #define DC 21
 
-TFT_eSPI tft = TFT_eSPI();
+// Declare buffer as a global variable
+static uint16_t color_buffer[320 * 40];
 
-int32_t my_lcd_send_cmd(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, const uint8_t *param, size_t param_size) {
-    tft.startWrite();
-    tft.writeCommand(*cmd);  // Send command
-    for (size_t i = 0; i < param_size; i++) {
-        tft.write(param[i]);  // Send parameters
+static void fillScreen(esp_lcd_panel_handle_t panel_handle, uint16_t color) {
+// ------------------------------------------  Filling Screen  ------------------------------------------
+    // Fill the buffer with red
+    for (int i = 0; i < 320 * 40; i++) {
+        color_buffer[i] = __builtin_bswap16(color);
     }
-    tft.endWrite();
-    return 0;  // Return 0 if successful
-}
 
-int32_t my_lcd_send_color(lv_display_t *disp, const uint8_t *cmd, size_t cmd_size, uint8_t *param, size_t param_size) {
-    tft.startWrite();
-    tft.writeCommand(*cmd);  // Send command (usually for writing to RAM)
-    tft.pushColors((uint16_t *)param, param_size / 2, true);  // Send color data
-    tft.endWrite();
-    return 0;  // Return 0 if successful
-}
-
-
-lv_display_t * lv_ili9341_create(
-        uint32_t hor_res,
-        uint32_t ver_res,
-        lv_lcd_flag_t flags,
-        lv_ili9341_send_cmd_cb_t send_cmd_cb,
-        lv_ili9341_send_color_cb_t send_color_cb
-);
-
-lv_display_t *display = lv_ili9341_create(240, 320, 0, my_lcd_send_cmd, my_lcd_send_color);
-
-
-void my_flush_cb(lv_fs_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
-    tft.startWrite();
-    tft.setAddrWindow(area->x1, area->y1, lv_area_get_width(area), lv_area_get_height(area));
-    tft.pushColors((uint16_t*)&color_p->full, lv_area_get_width(area) * lv_area_get_height(area), true);
-    tft.endWrite();
-    lv_disp_flush_ready((lv_display_t *) disp_drv);  // Notify LVGL that flush is done
-}
-
-// Register the flush_cb
-lv_fs_drv_t disp_drv;
-lv_fs_drv_init(&disp_drv);
-lv_disp_drv_register(&disp_drv);
-
-
-
-void lv_tick_task(void *arg) {
-    while (1) {
-        lv_tick_inc(1);
-        vTaskDelay(pdMS_TO_TICKS(1)); // Call this every 1 ms
+    // Draw screen in chunks
+    for (int y = 0; y < 320; y += 40) { // Draw in chunks
+        ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, 0, y, 320, y + 40, color_buffer));
     }
 }
 
 
-void app_main(void) {
-    // Initialize LVGL
-    lv_init();
 
-    // Initialize TFT driver
-    tft.begin();
-    tft.setRotation(1);
+_Noreturn void app_main(void) {
+// ------------------------------------------  SPI Bus  ------------------------------------------
+    spi_bus_config_t busConfig = {
+            .sclk_io_num = SCK,
+            .mosi_io_num = MOSI,
+            .miso_io_num = MISO,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+            .max_transfer_sz = 240 * 20 * sizeof(uint16_t)
+    };
+    spi_bus_free(SPI2_HOST);
+    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &busConfig, SPI_DMA_CH_AUTO));
+// ------------------------------------------  Display Config  ------------------------------------------
+    esp_lcd_panel_io_spi_config_t io_config = {
+            .dc_gpio_num = DC,
+            .cs_gpio_num = CS,
+            .pclk_hz = 64 * 1000 * 1000,
+            .spi_mode = 0,
+            .lcd_cmd_bits = 8,
+            .lcd_param_bits = 8,
+            .trans_queue_depth = 10,
+            .on_color_trans_done = NULL,
+            .user_ctx = NULL,
+            .flags = {
+                    .dc_low_on_data = 0,
+                    .dc_low_on_param = 0
+            }
+    };
+    esp_lcd_panel_io_handle_t io_handle = NULL;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI2_HOST, &io_config, &io_handle));
 
-    // Create a display buffer
-    static lv_draw_buf_t draw_buf;
-    static lv_color_t buf[240 * 10];  // Size of the buffer
-    lv_draw_buf_init(&draw_buf, 320, 240, (lv_color_format_t) buf, 0, NULL, 320 * 10);
+// ------------------------------------------  Panel Config  ------------------------------------------
+    esp_lcd_panel_dev_config_t panel_config = {
+            .reset_gpio_num = RST,
+            .rgb_ele_order = ESP_LCD_COLOR_SPACE_BGR,
+            .bits_per_pixel = 16
+    };
+    esp_lcd_panel_handle_t panel_handle = NULL;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_ili9341(io_handle, &panel_config, &panel_handle));
 
+// ------------------------------------------  Backlight config  ------------------------------------------
+    gpio_config_t bl_gpio_config = {
+            .pin_bit_mask = (1ULL << BL),
+            .mode = GPIO_MODE_OUTPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&bl_gpio_config);
+    gpio_set_level(BL, 1);
 
-    // Create a "Hello World" label
-    lv_obj_t *label = lv_label_create(lv_scr_act());  // Create a label on the active screen
-    lv_label_set_text(label, "Hello World!");         // Set label text
-    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);       // Align the label to the center
+// ------------------------------------------  Resetting TFT  ------------------------------------------
+    ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
+    ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
 
-    xTaskCreate(lv_tick_task, "lv_tick_task", 2048, NULL, 10, NULL);
+// -----------------------------------  Set the display orientation ------------------------------------
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, false, true));
 
+    // Init colors array
+    uint16_t color_array[6] = {0xf800, 0x07e0, 0x001f, 0xffe0, 0x07ff, 0xf81f};
+    uint8_t currentColor = 0;
 
+// ----------------------------------  Ensuring display is turned on  ----------------------------------
+    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
 
-    while (1) {
-        lv_timer_handler();  // Handle the LVGL tasks
-        vTaskDelay(pdMS_TO_TICKS(10)); // Call this every 10 ms
+    while (true) {
+        switch (currentColor) {
+            case 0:
+                printf("Red!\n");
+                break;
+            case 1:
+                printf("Green!\n");
+                break;
+            case 2:
+                printf("Blue!\n");
+                break;
+            case 3:
+                printf("Yellow!\n");
+                break;
+            case 4:
+                printf("Cyan!\n");
+                break;
+            case 5:
+                printf("Magenta!\n");
+                break;
+            default:
+                currentColor = 0;
+                printf("Red!\n");
+                break;
+        }
+
+        fillScreen(panel_handle, color_array[currentColor]);
+        currentColor++;
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }

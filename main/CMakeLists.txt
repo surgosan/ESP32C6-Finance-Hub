@@ -1,4 +1,4 @@
 idf_component_register(SRCS "main.c"
         INCLUDE_DIRS "."
-        REQUIRES lvgl tft_espi driver
+#        REQUIRES lvgl tft_espi driver
 )

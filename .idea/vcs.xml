@@ -27,6 +27,5 @@
     <mapping directory="$PROJECT_DIR$/../../../../Espressif/frameworks/esp-idf-v5.2.1/components/unity/unity" vcs="Git" />
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/components/lvgl" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/components/tft_espi" vcs="Git" />
   </component>
 </project>
