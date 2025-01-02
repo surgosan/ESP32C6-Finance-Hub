@@ -17,6 +17,6 @@ dependencies:
 direct_dependencies:
 - espressif/cmake_utilities
 - idf
-manifest_hash: 11e38c435faefb8ad10b8aab1fff0b5d11a4096807cbd8bd73fa8bda1b5d2e88
+manifest_hash: e9142e46c3fc7008db9fd31e2ff1a40cd10aed935fab3a2ef635a6edd5200578
 target: esp32c6
 version: 2.0.0
