@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
@@ -7,7 +8,7 @@
 #include "esp_lcd_ili9341.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include <stdio.h>
+#include "lvgl.h"
 
 #define BL 15
 #define SCK 6
@@ -100,6 +101,8 @@ _Noreturn void app_main(void) {
 // ----------------------------------  Ensuring display is turned on  ----------------------------------
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
 
+
+// ---------------------------------------------  RUNNING ---------------------------------------------
     while (true) {
         switch (currentColor) {
             case 0:
