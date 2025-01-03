@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
+//#include "ui.h"
 
 #define BL 15
 #define SCK 6
@@ -20,8 +21,11 @@
 #define DC 21
 
 // Declare buffer as a global variable
-static uint16_t buffer[320 * 20];
+static uint16_t buffer[320 * 40];
 static esp_lcd_panel_handle_t panel_handle;
+
+static lv_obj_t *counter_label;
+static int counter = 0;
 // ------------------------------------------  Filling Screen  ------------------------------------------
 /*
 static void fillScreen(esp_lcd_panel_handle_t panel_handle, uint16_t color) {
@@ -46,6 +50,12 @@ void lvgl_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *px_map
     lv_display_flush_ready(display); // Notify LVGL the flushing is done
 }
 
+static void counter_update_cb(lv_timer_t *timer) {
+    char timer_buffer[16];
+    snprintf(timer_buffer, sizeof(timer_buffer), "Count: %d", counter++);
+    lv_label_set_text(counter_label, timer_buffer);
+}
+
 _Noreturn void lvgl_task(void *pvParameters) {
     while(true) {
         lv_timer_handler();
@@ -62,7 +72,7 @@ void app_main(void) {
             .miso_io_num = MISO,
             .quadwp_io_num = -1,
             .quadhd_io_num = -1,
-            .max_transfer_sz = 320 * 20 * sizeof(uint16_t)
+            .max_transfer_sz = 320 * 40 * sizeof(uint16_t)
     };
     spi_bus_free(SPI2_HOST);
     ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &busConfig, SPI_DMA_CH_AUTO));
@@ -113,7 +123,8 @@ void app_main(void) {
     ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
     printf("TFT Init\n");
 // -----------------------------------  Set the display orientation ------------------------------------
-    ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, false));
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, true)); // True = Landscape
+    ESP_ERROR_CHECK(esp_lcd_panel_mirror(panel_handle, true, true));
     printf("Orientation Set\n");
 // ----------------------------------  Ensuring display is turned on  ----------------------------------
     ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(panel_handle, true));
@@ -138,9 +149,13 @@ void app_main(void) {
     printf("Flush set\n");
 
     lv_obj_set_size(lv_screen_active(), 320, 240); // Explicit size
-    lv_display_set_rotation(display, LV_DISPLAY_ROTATION_90);
+    lv_display_set_rotation(display, LV_DISPLAY_ROTATION_180);
     // Set background to red
-    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0xFF0000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x0000ff), LV_PART_MAIN);
+
+
+//    ui_init();
+
     // Create Hello World Label
     lv_obj_t *label = lv_label_create(lv_screen_active());
     printf("Label Created\n");
@@ -148,10 +163,16 @@ void app_main(void) {
     printf("Text Set\n");
     lv_obj_set_style_text_color(label, lv_color_hex(0x000000), LV_PART_MAIN);
     printf("Set Color to black\n");
-//    lv_obj_align(label, LV_ALIGN_BOTTOM_MID, 0, 0);
-//    printf("Text Aligned\n");
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 40);
+    printf("Text Aligned\n");
+
+    // Create counter label
+    counter_label = lv_label_create(lv_screen_active());
+    lv_label_set_text(counter_label, "Count: 0");
+    lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
 
 
+    lv_timer_create(counter_update_cb, 1000, NULL);
 
     printf("Time since startup: %lu\n", lv_tick_get_cb());
 // ---------------------------------------------  RUNNING ---------------------------------------------
