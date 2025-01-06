@@ -141,8 +141,8 @@ void wifi_init(void) {
 
 // Updates time label with given parameter
 void update_time(const char *time_str) {
-    char displayString[15];
-    sprintf(displayString, "2025... Day %s",time_str);
+    char displayString[20];
+    sprintf(displayString, "Year: 2025\n Week: %s",time_str);
     lv_label_set_text(time_label, displayString);
 }
 
@@ -163,7 +163,7 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
             break;
         case HTTP_EVENT_ON_FINISH: // Run this once all data is received
             cJSON *json = cJSON_Parse(response_buffer); // Parses response_buffer into JSON
-            const cJSON *jsonResult = cJSON_GetObjectItem(json, "day_of_year"); // Gets the object we want
+            const cJSON *jsonResult = cJSON_GetObjectItem(json, "week_number"); // Gets the object we want
 
             if (cJSON_IsString(jsonResult)) { // If a string, call update_time to insert it into the label
                 update_time(jsonResult->valuestring);
