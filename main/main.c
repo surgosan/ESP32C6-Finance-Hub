@@ -45,6 +45,11 @@ static EventGroupHandle_t s_wifi_event_group; // Handles the event and its respo
 static int s_retry_num = 0; // Keeps count of how many times a connection was attempted
 
 // ------------------------------------------ LVGL Objects ------------------------------------------
+static lv_obj_t *home;
+static lv_obj_t *second;
+
+static lv_style_t text_style;
+
 static lv_obj_t *counter_label;
 static int counter = 0;
 
@@ -229,6 +234,18 @@ static void counter_update_cb() {
     char timer_buffer[16];
     snprintf(timer_buffer, sizeof(timer_buffer), "Count: %d", counter++);
     lv_label_set_text(counter_label, timer_buffer);
+
+    if(counter % 20 == 0) {
+        lv_screen_load_anim(home, LV_SCR_LOAD_ANIM_OVER_TOP, 1000, 0, false);
+        lv_obj_set_parent(counter_label, home);
+        return;
+    }
+
+    if(counter % 10 == 0) {
+        lv_screen_load_anim(second, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 1000, 0, false);
+        lv_obj_set_parent(counter_label, second);
+        return;
+    }
 }
 
 // Main LVGL task that will run indefinitely (Like void loop() in arduino)
@@ -341,6 +358,9 @@ void app_main(void) {
 // --------------------------------------------  LVGL  --------------------------------------------
     // Mandatory function. LVGL functions will not work without this
     lv_init();
+    // Init style
+    lv_style_init(&text_style);
+    lv_style_set_text_font(&text_style, LV_FONT_MONTSERRAT_20);
     // Set tick callback
     lv_tick_set_cb(lv_tick_get_cb);
     // Creating LVGL display
@@ -355,25 +375,32 @@ void app_main(void) {
     lv_obj_set_size(lv_screen_active(), 320, 240);
     // Define rotation
     lv_display_set_rotation(display, LV_DISPLAY_ROTATION_180);
+    // Create home screen
+    home = lv_obj_create(NULL);
+    // Create second screen
+    second = lv_obj_create(NULL);
+    // Load Home screen
+    lv_screen_load(home);
     // Set background to black
-    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(home, lv_color_hex(0xff0000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
 
     // This is for SquareLine Studio if I am using it. (Currently not).
 //    ui_init();
 
     // Hello World Label
-    lv_obj_t *label = lv_label_create(lv_screen_active());
+    lv_obj_t *label = lv_label_create(home);
     lv_label_set_text(label, "Hello World\n");
     lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 40);
 
     // Counter label
-    counter_label = lv_label_create(lv_screen_active());
+    counter_label = lv_label_create(second);
     lv_label_set_text(counter_label, "Count: 0");
     lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
 
     // Time label
-    time_label = lv_label_create(lv_screen_active());
+    time_label = lv_label_create(second);
     lv_label_set_text(time_label, "Fetching...");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0);
