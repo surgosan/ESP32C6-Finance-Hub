@@ -48,7 +48,7 @@ static int s_retry_num = 0; // Keeps count of how many times a connection was at
 static lv_obj_t *home;
 static lv_obj_t *second;
 
-static lv_style_t text_style;
+//static lv_style_t text_style;
 
 static lv_obj_t *counter_label;
 static int counter = 0;
@@ -235,17 +235,17 @@ static void counter_update_cb() {
     snprintf(timer_buffer, sizeof(timer_buffer), "Count: %d", counter++);
     lv_label_set_text(counter_label, timer_buffer);
 
-    if(counter % 20 == 0) {
-        lv_screen_load_anim(home, LV_SCR_LOAD_ANIM_OVER_TOP, 1000, 0, false);
-        lv_obj_set_parent(counter_label, home);
-        return;
-    }
-
-    if(counter % 10 == 0) {
-        lv_screen_load_anim(second, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 1000, 0, false);
-        lv_obj_set_parent(counter_label, second);
-        return;
-    }
+//    if(counter % 20 == 0) {
+//        lv_screen_load_anim(home, LV_SCR_LOAD_ANIM_OVER_TOP, 1000, 0, false);
+//        lv_obj_set_parent(counter_label, home);
+//        return;
+//    }
+//
+//    if(counter % 10 == 0) {
+//        lv_screen_load_anim(second, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 1000, 0, false);
+//        lv_obj_set_parent(counter_label, second);
+//        return;
+//    }
 }
 
 // Main LVGL task that will run indefinitely (Like void loop() in arduino)
@@ -359,8 +359,7 @@ void app_main(void) {
     // Mandatory function. LVGL functions will not work without this
     lv_init();
     // Init style
-    lv_style_init(&text_style);
-    lv_style_set_text_font(&text_style, LV_FONT_MONTSERRAT_20);
+//    lv_style_init(&text_style);
     // Set tick callback
     lv_tick_set_cb(lv_tick_get_cb);
     // Creating LVGL display
@@ -389,27 +388,29 @@ void app_main(void) {
 //    ui_init();
 
     // Hello World Label
-    lv_obj_t *label = lv_label_create(home);
-    lv_label_set_text(label, "Hello World\n");
-    lv_obj_set_style_text_color(label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 40);
+    lv_obj_t *totalBalance = lv_label_create(home);
+    lv_label_set_text(totalBalance, LV_SYMBOL_WIFI "Fetching Balance...\n");
+    lv_obj_set_style_text_color(totalBalance, lv_color_hex(0xffffff), LV_PART_MAIN);
+//    lv_obj_set_style_text_font(totalBalance, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_align(totalBalance, LV_ALIGN_CENTER, 0, 0);
 
     // Counter label
-    counter_label = lv_label_create(second);
+    counter_label = lv_label_create(home);
     lv_label_set_text(counter_label, "Count: 0");
     lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
 
     // Time label
+/*
     time_label = lv_label_create(second);
     lv_label_set_text(time_label, "Fetching...");
     lv_obj_set_style_text_color(time_label, lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0);
-
+*/
     // Create timer updater
     lv_timer_create(counter_update_cb, 1000, NULL);
 
     // Get current time via API
-    fetch_time();
+//    fetch_time();
 
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
