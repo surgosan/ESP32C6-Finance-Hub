@@ -1,12 +1,9 @@
 #include <stdio.h>
 #include <esp_timer.h>
 #include <esp_log.h>
-#include "esp_wifi.h"
-#include "nvs_flash.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
-#include "esp_http_client.h"
 #include "cJSON.h"
 #include "lvgl.h"
 #include "driver/gpio.h"
@@ -15,7 +12,12 @@
 #include "esp_lcd_panel_ops.h"
 #include "driver/spi_master.h"
 #include "esp_lcd_ili9341.h"
-//#include "ui.h"
+#include "esp_spiffs.h"
+#include "gifdec.h"
+#include <fcntl.h>
+#include "unistd.h"
+
+#define FRAME_DELAY_MS 100
 
 #define BL 15
 #define SCK 6
@@ -30,192 +32,70 @@ static uint16_t buffer[240 * 20];
 static uint16_t buffer2[240 * 20];
 static esp_lcd_panel_handle_t panel_handle;
 
-// Tags are for logging. Basically a label for logs
-static const char *WIFI_TAG = "WiFi";
-static const char *TAG = "HTTP_CLIENT";
+void init_spiffs(void) {
+    esp_vfs_spiffs_conf_t conf = {
+            .base_path = "/spiffs",
+            .partition_label = NULL,
+            .max_files = 5,
+            .format_if_mount_failed = true
+    };
 
-// Wifi Config
-#define WIFI_SSID "NETGEAR17"
-#define WIFI_PASS "Rosselin06"
-#define WIFI_MAX_RETRY 5 // The max amount of wifi connect retries before it throws an error
-
-static EventGroupHandle_t s_wifi_event_group; // Handles the event and its responses
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT BIT1
-static int s_retry_num = 0; // Keeps count of how many times a connection was attempted
+    ESP_ERROR_CHECK(esp_vfs_spiffs_register(&conf));
+}
 
 // ------------------------------------------ LVGL Objects ------------------------------------------
 static lv_obj_t *home;
-static lv_obj_t *second;
 
-//static lv_style_t text_style;
+void display_gif(const char *file_path, lv_obj_t *img_obj) {
+    int fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        ESP_LOGE("GIF", "Failed to open GIF file: %s", file_path);
+        return;
+    }
 
-static lv_obj_t *counter_label;
-static int counter = 0;
+    gd_GIF *gif = gd_open_gif((const char *) fd);
+    if (!gif) {
+        ESP_LOGE("GIF", "Failed to decode GIF");
+        close(fd);
+        return;
+    }
 
-static lv_obj_t *time_label;
-// -----------------------------------------  API Functions  ------------------------------------------
+    // Prepare LVGL image descriptor
+    static lv_img_dsc_t img_dsc;
+    img_dsc.header.w = gif->width;
+    img_dsc.header.h = gif->height;
+    img_dsc.data_size = gif->width * gif->height * 2; // RGB565
+    img_dsc.data = malloc(img_dsc.data_size);
 
-// -----------------------  WiFi  -----------------------
+    uint16_t *framebuffer = (uint16_t *)img_dsc.data;
 
-// Function to connect to WiFi, get it IP address and log progress. Also, will automatically retry to connect if it fails
-static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+    while (1) {
+        if (!gd_get_frame(gif)) break;
 
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        // Try to connect again up to X amount of times set in WIFI_MAX_RETRY
-        if (s_retry_num < WIFI_MAX_RETRY) {
-            esp_wifi_connect(); // Try to connect
-            s_retry_num++; // Increase retry num
-            ESP_LOGI(WIFI_TAG, "Retry to connect to AP");
-        } else {
-            xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT); // Wifi Failed
+        // Convert RGB888 from gifdec to RGB565 for the framebuffer
+        for (int i = 0; i < gif->width * gif->height; i++) {
+            uint8_t *rgb888 = &gif->frame[i * 3];
+            framebuffer[i] = ((rgb888[0] >> 3) << 11) |  // Red
+                             ((rgb888[1] >> 2) << 5)  |  // Green
+                             (rgb888[2] >> 3);          // Blue
         }
-        ESP_LOGI(WIFI_TAG, "Failed to connect to AP");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(WIFI_TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+
+        // Update the LVGL image widget
+        lv_img_set_src(img_obj, &img_dsc);
+        lv_obj_invalidate(img_obj); // Mark the image object as dirty to refresh
+
+        // Wait for the frame delay
+        vTaskDelay(gif->gce.delay * 10 / portTICK_PERIOD_MS);
+
+        // Handle loop count
+//        if (gif->loop_count && gif->loop_count == gif->loop) break;
     }
+
+    // Cleanup
+    free(img_dsc.data);
+    gd_close_gif(gif);
+    close(fd);
 }
-
-// Initializes the WiFi library and handlers. WiFi functions will not work without this
-void wifi_init(void) {
-    ESP_LOGI(WIFI_TAG, "Initializing WIFI...");
-    // Create the event group to handle WiFi events
-    s_wifi_event_group = xEventGroupCreate();
-
-    // Boring mandatory Espressif stuff.
-    ESP_ERROR_CHECK(esp_netif_init());
-
-    // Set network setting to station (connect to another source)
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
-
-    // Set Device name
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, "ESP32 C6 Finance Hub"));
-
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
-            WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id
-            )
-    );
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(
-            IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip
-            )
-    );
-
-    // List the WiFi configuration like name, password, type of connection, etc.
-    wifi_config_t wifi_config = {
-            .sta = {
-                    .ssid = WIFI_SSID,
-                    .password = WIFI_PASS,
-                    .threshold.authmode = WIFI_AUTH_WPA2_PSK,
-            },
-    };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    ESP_LOGI(WIFI_TAG, "Wi-Fi initialization finished");
-
-    EventBits_t bits = xEventGroupWaitBits(
-            s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY
-        );
-
-    if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(WIFI_TAG, "Connected to SSID:%s", WIFI_SSID);
-    } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s", WIFI_SSID);
-    } else {
-        ESP_LOGE(WIFI_TAG, "Unexpected Wi-Fi event");
-    }
-}
-
-
-
-// -----------------------  Time  -----------------------
-
-// Updates time label with given parameter
-void update_time(const char *time_str) {
-    char displayString[20];
-    sprintf(displayString, "Year: 2025\n Week: %s",time_str);
-    lv_label_set_text(time_label, displayString);
-}
-
-
-esp_err_t http_event_handler(esp_http_client_event_t *event) {
-    static char response_buffer[1024];
-    static int data_len = 0;
-
-    switch (event->event_id) {
-        case HTTP_EVENT_ON_DATA: // Run this while still receiving data
-            if (!esp_http_client_is_chunked_response(event->client)) {
-                if (data_len + event->data_len < sizeof(response_buffer)) {
-                    memcpy(response_buffer + data_len, event->data, event->data_len);
-                    data_len += event->data_len;
-                    response_buffer[data_len] = 0;
-                }
-            }
-            break;
-        case HTTP_EVENT_ON_FINISH: // Run this once all data is received
-            cJSON *json = cJSON_Parse(response_buffer); // Parses response_buffer into JSON
-            const cJSON *jsonResult = cJSON_GetObjectItem(json, "week_number"); // Gets the object we want
-
-            if (cJSON_IsString(jsonResult)) { // If a string, call update_time to insert it into the label
-                update_time(jsonResult->valuestring);
-            } else if(cJSON_IsNumber(jsonResult)){ // If an integer, call update_time to insert it into the label
-                char intBuffer[5]; // Buffer to hold integer as a string
-                snprintf(intBuffer, sizeof(intBuffer), "%d", jsonResult->valueint); // Convert int to string
-                update_time(intBuffer);
-            } else {
-                update_time("Invalid Time"); // Else display this
-            }
-
-            cJSON_Delete(json); // Free up memory
-            data_len = 0; // Reset counter
-            break;
-        case HTTP_EVENT_ERROR: // Run this if we run into an error
-            update_time("Error");
-            ESP_LOGE(TAG, "HTTP_EVENT_ERROR");
-            break;
-        default:
-            break;
-    }
-    return ESP_OK;
-}
-
-void fetch_time() {
-
-    // Define the url and handler that we want to connect => Link to processing function
-    esp_http_client_config_t config = {
-            .url = "http://worldtimeapi.org/api/timezone/Etc/UTC",
-            .event_handler = http_event_handler,
-    };
-
-    // Init the client with the config
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-
-    // Make sure the client runs correctly
-    esp_err_t err = esp_http_client_perform(client);
-    if(err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP GET Success");
-    } else {
-        ESP_LOGE(TAG, "HTTP GET Failed");
-        update_time("HTTP ERROR");
-    }
-    esp_http_client_cleanup(client); // Free up memory
-}
-
-
 // ------------------------------------------ LVGL Functions ------------------------------------------
 
 // Gets the amount of time since system startup in ms
@@ -229,25 +109,6 @@ void lvgl_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *px_map
     lv_display_flush_ready(display); // Notify LVGL the flushing is done
 }
 
-// Controls custom count label with each second
-static void counter_update_cb() {
-    char timer_buffer[16];
-    snprintf(timer_buffer, sizeof(timer_buffer), "Count: %d", counter++);
-    lv_label_set_text(counter_label, timer_buffer);
-
-//    if(counter % 20 == 0) {
-//        lv_screen_load_anim(home, LV_SCR_LOAD_ANIM_OVER_TOP, 1000, 0, false);
-//        lv_obj_set_parent(counter_label, home);
-//        return;
-//    }
-//
-//    if(counter % 10 == 0) {
-//        lv_screen_load_anim(second, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 1000, 0, false);
-//        lv_obj_set_parent(counter_label, second);
-//        return;
-//    }
-}
-
 // Main LVGL task that will run indefinitely (Like void loop() in arduino)
 _Noreturn void lvgl_task() {
     while(true) {
@@ -259,25 +120,8 @@ _Noreturn void lvgl_task() {
 // Main application setup
 void app_main(void) {
     printf("Starting Application\n");
-// -------------------------------------------  Wi-Fi  -------------------------------------------
 
-    // Boring mandatory espressif wifi stuff
-    esp_err_t ret = nvs_flash_init();
-    if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
-    }
-
-    // Call function to init wifi
-    wifi_init();
-
-    // More boring mandatory espressif wifi stuff
-    esp_netif_ip_info_t ip_info;
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    esp_netif_get_ip_info(netif, &ip_info);
-    printf("IP Address: " IPSTR "\n", IP2STR(&ip_info.ip));
-    printf("Gateway: " IPSTR "\n", IP2STR(&ip_info.gw));
-    printf("Netmask: " IPSTR "\n", IP2STR(&ip_info.netmask));
+    init_spiffs();
 // ------------------------------------------  SPI Bus  ------------------------------------------
     // Config the SPI bus
     spi_bus_config_t busConfig = {
@@ -358,8 +202,6 @@ void app_main(void) {
 // --------------------------------------------  LVGL  --------------------------------------------
     // Mandatory function. LVGL functions will not work without this
     lv_init();
-    // Init style
-//    lv_style_init(&text_style);
     // Set tick callback
     lv_tick_set_cb(lv_tick_get_cb);
     // Creating LVGL display
@@ -376,41 +218,33 @@ void app_main(void) {
     lv_display_set_rotation(display, LV_DISPLAY_ROTATION_180);
     // Create home screen
     home = lv_obj_create(NULL);
-    // Create second screen
-    second = lv_obj_create(NULL);
     // Load Home screen
     lv_screen_load(home);
     // Set background to black
-    lv_obj_set_style_bg_color(home, lv_color_hex(0xff0000), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(home, lv_color_hex(0x000000), LV_PART_MAIN);
 
-    // This is for SquareLine Studio if I am using it. (Currently not).
-//    ui_init();
+    // Load GIF on screen
+    lv_obj_t *img_obj = lv_img_create(home);
+    lv_obj_align(img_obj, LV_ALIGN_CENTER, 0, 0);
+    display_gif("/spiffs/ouiaiu.gif", img_obj);
 
-    // Hello World Label
+    // O U I I A U Text
+    lv_obj_t *left_eye = lv_label_create(home);
+    lv_label_set_text(left_eye, LV_SYMBOL_EYE_OPEN "_" LV_SYMBOL_EYE_OPEN);
+    lv_obj_set_style_text_color(left_eye, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(left_eye, LV_ALIGN_TOP_LEFT, 10, 10);
+
+    // O U I I A U Text
     lv_obj_t *totalBalance = lv_label_create(home);
-    lv_label_set_text(totalBalance, LV_SYMBOL_WIFI "Fetching Balance...\n");
+    lv_label_set_text(totalBalance, "O U I I A U");
     lv_obj_set_style_text_color(totalBalance, lv_color_hex(0xffffff), LV_PART_MAIN);
-//    lv_obj_set_style_text_font(totalBalance, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_align(totalBalance, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(totalBalance, LV_ALIGN_TOP_MID, 0, 10);
 
-    // Counter label
-    counter_label = lv_label_create(home);
-    lv_label_set_text(counter_label, "Count: 0");
-    lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-
-    // Time label
-/*
-    time_label = lv_label_create(second);
-    lv_label_set_text(time_label, "Fetching...");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(time_label, LV_ALIGN_CENTER, 0, 0);
-*/
-    // Create timer updater
-    lv_timer_create(counter_update_cb, 1000, NULL);
-
-    // Get current time via API
-//    fetch_time();
+    // O U I I A U Text
+    lv_obj_t *right_eye = lv_label_create(home);
+    lv_label_set_text(right_eye, LV_SYMBOL_EYE_OPEN "_" LV_SYMBOL_EYE_OPEN);
+    lv_obj_set_style_text_color(right_eye, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(right_eye, LV_ALIGN_TOP_RIGHT, -10, 10);
 
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
