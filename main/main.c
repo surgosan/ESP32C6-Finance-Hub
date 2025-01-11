@@ -31,8 +31,6 @@ static uint16_t buffer[240 * 20];
 static uint16_t buffer2[240 * 20];
 static esp_lcd_panel_handle_t panel_handle;
 
-//static const char* info_tag;
-
 // ------------------------------------------ LVGL Objects ------------------------------------------
 static lv_obj_t *home;
 static lv_obj_t *second;

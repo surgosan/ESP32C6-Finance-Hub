@@ -56,24 +56,21 @@ void wifi_init(void) {
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
-    esp_netif_ip_info_t ip_info;
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-//    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, "ESP32 C6 Finance Hub"));
-    esp_netif_get_ip_info(netif, &ip_info);
-    printf("IP Address: " IPSTR "\n", IP2STR(&ip_info.ip));
-    printf("Gateway: " IPSTR "\n", IP2STR(&ip_info.gw));
-    printf("Netmask: " IPSTR "\n", IP2STR(&ip_info.netmask));
-
     ESP_LOGI(WIFI_TAG, "Initializing WIFI...");
-    // Create the event group to handle WiFi events
-    s_wifi_event_group = xEventGroupCreate();
-
-    // Boring mandatory Espressif stuff.
     ESP_ERROR_CHECK(esp_netif_init());
-
     // Set network setting to station (connect to another source)
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+
+    esp_netif_t *netif = esp_netif_create_default_wifi_sta();
+    if (!netif) {
+        ESP_LOGE(WIFI_TAG, "Failed to create default WiFi station netif");
+        return;
+    }
+
+    ESP_ERROR_CHECK(esp_netif_set_hostname(netif, "ESP32 C6 Finance Hub"));
+
+    // Create the event group to handle WiFi events
+    s_wifi_event_group = xEventGroupCreate();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -102,6 +99,12 @@ void wifi_init(void) {
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(WIFI_TAG, "Wi-Fi initialization finished");
+
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(netif, &ip_info);
+    printf("IP Address: " IPSTR "\n", IP2STR(&ip_info.ip));
+    printf("Gateway: " IPSTR "\n", IP2STR(&ip_info.gw));
+    printf("Netmask: " IPSTR "\n", IP2STR(&ip_info.netmask));
 
     EventBits_t bits = xEventGroupWaitBits(
             s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY
