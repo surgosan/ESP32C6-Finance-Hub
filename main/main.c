@@ -97,7 +97,6 @@ void app_main(void) {
     // Init the SPI bus and respond to errors.
     ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &busConfig, SPI_DMA_CH_AUTO));
 // ------------------------------------------  Display Config  ------------------------------------------
-
     // Config lcd panel
     esp_lcd_panel_io_spi_config_t io_config = {
             .dc_gpio_num = DC,
@@ -120,7 +119,6 @@ void app_main(void) {
     // Init the lcd with the empty handle & config
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI2_HOST, &io_config, &io_handle));
 // ------------------------------------------  Panel Config  ------------------------------------------
-
     // Config panel data
     esp_lcd_panel_dev_config_t panel_config = {
             .reset_gpio_num = RST,
@@ -133,7 +131,6 @@ void app_main(void) {
     // Init the panel with the empty handle & config
     ESP_ERROR_CHECK(esp_lcd_new_panel_ili9341(io_handle, &panel_config, &panel_handle));
 // ------------------------------------------  Backlight config  ------------------------------------------
-
     // Define gpio for BL
     gpio_config_t bl_gpio_config = {
             .pin_bit_mask = (1ULL << BL),
@@ -183,7 +180,7 @@ void app_main(void) {
     // Load Home screen
     lv_screen_load(home);
     // Set background to black
-    lv_obj_set_style_bg_color(home, lv_color_hex(0xff0000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(home, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
 
     // Hello World Label

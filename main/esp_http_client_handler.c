@@ -8,9 +8,6 @@
 #include "esp_log.h"
 #include <string.h>
 #include "nvs_flash.h"
-#include "esp_wifi.h"
-
-
 
 // Define a TAG specific to the HTTP module
 static const char *TAG = "HTTP_CLIENT";
@@ -71,7 +68,7 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
 // Function to fetch time and return it as a string
 const char* fetch_time() {
     esp_http_client_config_t config = {
-            .url = "http://worldtimeapi.org/api/timezone/Etc/UTC",
+            .url = "http://worldtimeapi.org/api/timezone/America/New_York",
             .event_handler = http_event_handler,
     };
 
