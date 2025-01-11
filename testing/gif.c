@@ -1,5 +1,5 @@
 //
-// Created by sergy on 1/9/2025.
+// Created by sergy on 1/10/2025.
 //
 #include <stdio.h>
 #include <esp_timer.h>
@@ -15,8 +15,12 @@
 #include "esp_lcd_panel_ops.h"
 #include "driver/spi_master.h"
 #include "esp_lcd_ili9341.h"
-#include "esp_wifi_connect.h"
-#include "esp_http_client_handler.h"
+#include "esp_spiffs.h"
+#include "gifdec.h"
+#include <fcntl.h>
+#include "unistd.h"
+
+#define FRAME_DELAY_MS 100
 
 #define BL 15
 #define SCK 6
@@ -31,39 +35,81 @@ static uint16_t buffer[240 * 20];
 static uint16_t buffer2[240 * 20];
 static esp_lcd_panel_handle_t panel_handle;
 
-//static const char* info_tag;
+void init_spiffs(void) {
+    esp_vfs_spiffs_conf_t conf = {
+            .base_path = "/spiffs",
+            .partition_label = NULL,
+            .max_files = 5,
+            .format_if_mount_failed = true
+    };
+
+    ESP_ERROR_CHECK(esp_vfs_spiffs_register(&conf));
+}
 
 // ------------------------------------------ LVGL Objects ------------------------------------------
 static lv_obj_t *home;
-static lv_obj_t *second;
 
-static lv_obj_t *counter_label;
-static int counter = 0;
+void display_gif(const char *file_path, lv_obj_t *img_obj) {
+    int fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        ESP_LOGE("GIF", "Failed to open GIF file: %s", file_path);
+        return;
+    }
 
-static lv_obj_t *time_label;
-// -----------------------------------------  API Functions  ------------------------------------------
+    gd_GIF *gif = gd_open_gif((const char *) fd);
+    if (!gif) {
+        ESP_LOGE("GIF", "Failed to decode GIF");
+        close(fd);
+        return;
+    }
 
-// Updates time label with given parameter
-void update_time() {
-    char displayString[20];
-    sprintf(displayString, "Year: 2025\n Week: %s", fetch_time());
-    lv_label_set_text(time_label, displayString);
+    // Prepare LVGL image descriptor
+    static lv_img_dsc_t img_dsc;
+    img_dsc.header.w = gif->width;
+    img_dsc.header.h = gif->height;
+    img_dsc.data_size = gif->width * gif->height * 2; // RGB565
+    img_dsc.data = malloc(img_dsc.data_size);
+
+    uint16_t *framebuffer = (uint16_t *)img_dsc.data;
+
+    while (1) {
+        if (!gd_get_frame(gif)) break;
+
+        // Convert RGB888 from gifdec to RGB565 for the framebuffer
+        for (int i = 0; i < gif->width * gif->height; i++) {
+            uint8_t *rgb888 = &gif->frame[i * 3];
+            framebuffer[i] = ((rgb888[0] >> 3) << 11) |  // Red
+                             ((rgb888[1] >> 2) << 5)  |  // Green
+                             (rgb888[2] >> 3);          // Blue
+        }
+
+        // Update the LVGL image widget
+        lv_img_set_src(img_obj, &img_dsc);
+        lv_obj_invalidate(img_obj); // Mark the image object as dirty to refresh
+
+        // Wait for the frame delay
+        vTaskDelay(gif->gce.delay * 10 / portTICK_PERIOD_MS);
+
+        // Handle loop count
+//        if (gif->loop_count && gif->loop_count == gif->loop) break;
+    }
+
+    // Cleanup
+    free(img_dsc.data);
+    gd_close_gif(gif);
+    close(fd);
 }
 // ------------------------------------------ LVGL Functions ------------------------------------------
+
 // Gets the amount of time since system startup in ms
-uint32_t lv_tick_get_cb(void) { return esp_timer_get_time() / 1000; }
+uint32_t lv_tick_get_cb(void) {
+    return esp_timer_get_time() / 1000;
+}
 
 // Draws the screen
 void lvgl_flush_cb(lv_display_t *display, const lv_area_t *area, uint8_t *px_map) {
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel_handle, area->x1, area->y1, area->x2 + 1, area->y2 + 1, (uint16_t *)px_map));
     lv_display_flush_ready(display); // Notify LVGL the flushing is done
-}
-
-// Controls custom count label with each second
-static void counter_update_cb() {
-    char timer_buffer[16];
-    snprintf(timer_buffer, sizeof(timer_buffer), "Count: %d", counter++);
-    lv_label_set_text(counter_label, timer_buffer);
 }
 
 // Main LVGL task that will run indefinitely (Like void loop() in arduino)
@@ -74,14 +120,11 @@ _Noreturn void lvgl_task() {
     }
 }
 
-
-
 // Main application setup
 void app_main(void) {
     printf("Starting Application\n");
-// -------------------------------------------  Wi-Fi  -------------------------------------------
-    // Call function to init Wi-Fi
-    wifi_init();
+
+    init_spiffs();
 // ------------------------------------------  SPI Bus  ------------------------------------------
     // Config the SPI bus
     spi_bus_config_t busConfig = {
@@ -178,36 +221,33 @@ void app_main(void) {
     lv_display_set_rotation(display, LV_DISPLAY_ROTATION_180);
     // Create home screen
     home = lv_obj_create(NULL);
-    // Create second screen
-    second = lv_obj_create(NULL);
     // Load Home screen
     lv_screen_load(home);
     // Set background to black
-    lv_obj_set_style_bg_color(home, lv_color_hex(0xff0000), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(home, lv_color_hex(0x000000), LV_PART_MAIN);
 
-    // Hello World Label
+    // Load GIF on screen
+    lv_obj_t *img_obj = lv_img_create(home);
+    lv_obj_align(img_obj, LV_ALIGN_CENTER, 0, 0);
+    display_gif("/spiffs/ouiaiu.gif", img_obj);
+
+    // O U I I A U Text
+    lv_obj_t *left_eye = lv_label_create(home);
+    lv_label_set_text(left_eye, LV_SYMBOL_EYE_OPEN "_" LV_SYMBOL_EYE_OPEN);
+    lv_obj_set_style_text_color(left_eye, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(left_eye, LV_ALIGN_TOP_LEFT, 10, 10);
+
+    // O U I I A U Text
     lv_obj_t *totalBalance = lv_label_create(home);
-    lv_label_set_text(totalBalance, LV_SYMBOL_WIFI "Fetching Balance...\n");
+    lv_label_set_text(totalBalance, "O U I I A U");
     lv_obj_set_style_text_color(totalBalance, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(totalBalance, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(totalBalance, LV_ALIGN_TOP_MID, 0, 10);
 
-    // Counter label
-    counter_label = lv_label_create(home);
-    lv_label_set_text(counter_label, "Count: 0");
-    lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-
-    // Time label
-    time_label = lv_label_create(home);
-    lv_label_set_text(time_label, "Fetching...");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(time_label, LV_ALIGN_TOP_RIGHT, 0, 0);
-
-    // Create timer updater
-    lv_timer_create(counter_update_cb, 1000, NULL);
-
-    // Get current time via API
-    update_time();
+    // O U I I A U Text
+    lv_obj_t *right_eye = lv_label_create(home);
+    lv_label_set_text(right_eye, LV_SYMBOL_EYE_OPEN "_" LV_SYMBOL_EYE_OPEN);
+    lv_obj_set_style_text_color(right_eye, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(right_eye, LV_ALIGN_TOP_RIGHT, -10, 10);
 
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
