@@ -21,11 +21,4 @@ const char* fetch_time();
 */
 char* plaid_fetch_data(const char* access_token);
 
-/**
- * @brief Input the JSON response from plaid_fetch_data() to get first entry
- * @param json_response
- * @return First entry in the complete JSON response
- */
-char* plaid_parse_first_entry(const char* json_response);
-
 #endif //ESP32C6_FINANCE_HUB_ESP_HTTP_CLIENT_HANDLER_H

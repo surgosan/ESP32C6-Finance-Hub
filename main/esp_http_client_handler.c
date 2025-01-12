@@ -11,6 +11,8 @@
 
 // Define a TAG specific to the HTTP module
 static const char *TAG = "HTTP_CLIENT";
+static const char *PLAID_TAG = "Plaid Tag";
+
 
 // Buffer to hold the HTTP response data
 static char response_buffer[1024];
@@ -89,59 +91,114 @@ const char* fetch_time() {
 
 
 // --------------------------------------------------  Plaid Sandbox  --------------------------------------------------
+static char plaid_response[1024];
+
 static const char *PLAID_ROOT_CERT =
         "-----BEGIN CERTIFICATE-----\n"
-        "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\n"
+        "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\n"
-        "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\n"
+        "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\n"
+        "MrY=\n"
         "-----END CERTIFICATE-----\n";
 
-char* plaid_parse_first_entry(const char* json_response) {
-    cJSON* root = cJSON_Parse(json_response);
-    if (!root) {
-        ESP_LOGE("JSON", "Failed to parse JSON response");
-        return NULL;
+esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
+    static char* plaid_handler_buffer = NULL; // Buffer to accumulate the response
+    static int response_buffer_len = 0;
+
+    switch (evt->event_id) {
+        case HTTP_EVENT_ON_DATA:
+            if (evt->data_len > 0) {
+                // Reallocate buffer to accommodate new data
+                char* temp = realloc(plaid_handler_buffer, response_buffer_len + evt->data_len + 1);
+                if (!temp) {
+                    ESP_LOGE("Plaid Handler", "Failed to allocate memory for response buffer");
+                    free(plaid_handler_buffer);
+                    plaid_handler_buffer = NULL;
+                    response_buffer_len = 0;
+                    return ESP_FAIL;
+                }
+                plaid_handler_buffer = temp;
+
+                // Copy new data to the buffer
+                memcpy(plaid_handler_buffer + response_buffer_len, evt->data, evt->data_len);
+                response_buffer_len += evt->data_len;
+                plaid_handler_buffer[response_buffer_len] = '\0'; // Null-terminate the buffer
+            }
+            break;
+
+        case HTTP_EVENT_ON_FINISH:
+            ESP_LOGI("Plaid Handler", "HTTP response finished. Total response size: %d bytes", response_buffer_len);
+//            ESP_LOGI("Plaid Handler", "Response: %s", response_buffer);
+
+            // Parse and process the JSON response
+            cJSON* root = cJSON_Parse(plaid_handler_buffer);
+            if (root) {
+                // Handle JSON (similar to the earlier example)
+                cJSON* accounts = cJSON_GetObjectItem(root, "accounts");
+                if (cJSON_IsArray(accounts)) {
+                    cJSON* first_account = cJSON_GetArrayItem(accounts, 0);
+                    char* result = cJSON_Print(first_account);
+                    if(result) {
+                        snprintf(plaid_response, sizeof(plaid_response), "%s", result);
+                        ESP_LOGI(PLAID_TAG, "EVENT FINISH: %s", plaid_response);
+                        free(result);
+                    } else {
+                        ESP_LOGE(PLAID_TAG, "No First Account");
+                        cJSON_Delete(root);
+                    }
+
+                    cJSON_Delete(root);
+//                    cJSON_ArrayForEach(account, accounts) {
+//                        cJSON* name = cJSON_GetObjectItem(account, "name");
+//                        cJSON* balance = cJSON_GetObjectItem(account, "balances");
+//                        if (cJSON_IsString(name) && cJSON_IsObject(balance)) {
+//                            cJSON* available = cJSON_GetObjectItem(balance, "available");
+//                            cJSON* current = cJSON_GetObjectItem(balance, "current");
+//
+//                            ESP_LOGI("Plaid Handler", "Account: %s", name->valuestring);
+//                            ESP_LOGI("Plaid Handler", "Available Balance: %.2f", cJSON_IsNumber(available) ? available->valuedouble : 0.0);
+//                            ESP_LOGI("Plaid Handler", "Current Balance: %.2f", cJSON_IsNumber(current) ? current->valuedouble : 0.0);
+//                        }
+//                    }
+                } else {
+                    ESP_LOGE("Plaid Handler", "No 'accounts' array found in response");
+                }
+                cJSON_Delete(root);
+            } else {
+                ESP_LOGE("Plaid Handler", "Failed to parse JSON response");
+            }
+
+            // Free the response buffer
+            free(plaid_handler_buffer);
+            plaid_handler_buffer = NULL;
+            response_buffer_len = 0;
+            break;
+
+        case HTTP_EVENT_ERROR:
+            ESP_LOGE("Plaid Handler", "HTTP Event Error occurred");
+            break;
+
+        default:
+            break;
     }
 
-    // Navigate to the "accounts" array
-    cJSON* accounts = cJSON_GetObjectItem(root, "accounts");
-    if (!cJSON_IsArray(accounts)) {
-        ESP_LOGE("JSON", "No accounts found in the response");
-        cJSON_Delete(root);
-        return NULL;
-    }
-
-    // Get the first entry in the array
-    cJSON* first_account = cJSON_GetArrayItem(accounts, 0);
-    if (!first_account) {
-        ESP_LOGE("JSON", "No first account found");
-        cJSON_Delete(root);
-        return NULL;
-    }
-
-    // Convert the first account to a string
-    char* first_entry = cJSON_Print(first_account);
-
-    // Cleanup
-    cJSON_Delete(root);
-    return first_entry; // Caller must free this memory
+    return ESP_OK;
 }
 
 
@@ -150,7 +207,9 @@ char* plaid_fetch_data(const char* access_token) {
             .host = "sandbox.plaid.com",
             .url = "https://sandbox.plaid.com/accounts/balance/get",
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
-            .cert_pem = PLAID_ROOT_CERT
+            .cert_pem = PLAID_ROOT_CERT,
+            .skip_cert_common_name_check = true,
+            .event_handler = plaid_http_handler, // Assign event handler
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -158,39 +217,24 @@ char* plaid_fetch_data(const char* access_token) {
     // Set headers
     esp_http_client_set_header(client, "Content-Type", "application/json");
     char auth_header[256];
-    sprintf(auth_header, "Bearer %s", access_token);
+    snprintf(auth_header, sizeof(auth_header), "Bearer %s", access_token);
     esp_http_client_set_header(client, "Authorization", auth_header);
 
     // Set POST data
     char post_data[512];
     snprintf(post_data, sizeof(post_data),
-             "{\"client_id\": \"677b513d0e534e0022b15d14\", \"secret\": \"8ce43a766b4fad961aaedb6857ad03\", \"access_token\": \"%s\"}",
-             access_token);
+             "{\"client_id\":\"%s\",\"secret\":\"%s\",\"access_token\":\"%s\"}",
+             PLAID_CLIENT_ID, PLAID_SECRET, access_token);
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
 
     // Perform the HTTP request
     esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP Status = %d", esp_http_client_get_status_code(client));
-
-        // Read the response content
-        int content_length = esp_http_client_get_content_length(client);
-        char* plaid_response = malloc(content_length + 1);
-        if (plaid_response) {
-            esp_http_client_read(client, plaid_response, content_length);
-            plaid_response[content_length] = '\0'; // Null-terminate the response
-            ESP_LOGI(TAG, "Response: %s", plaid_response);
-
-            esp_http_client_cleanup(client);
-            return plaid_response; // Return the response for parsing
-        } else {
-            ESP_LOGE(TAG, "Failed to allocate memory for response buffer");
-        }
-    } else {
-        ESP_LOGE(TAG, "Error performing HTTP request: %s", esp_err_to_name(err));
+    if (err != ESP_OK) {
+        ESP_LOGE(PLAID_TAG, "Error performing HTTP request: %s", esp_err_to_name(err));
     }
 
     esp_http_client_cleanup(client);
-    return NULL; // Return NULL if there was an error
+
+    return(plaid_response);
 }
