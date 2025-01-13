@@ -149,6 +149,7 @@ esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
             // Parse and process the JSON response
             cJSON* root = cJSON_Parse(plaid_handler_buffer);
             if (root) {
+                ESP_LOGI(PLAID_TAG, "%s", cJSON_Print(root));
                 // Handle JSON (similar to the earlier example)
                 cJSON* accounts = cJSON_GetObjectItem(root, "accounts");
                 if (cJSON_IsArray(accounts)) {
@@ -156,26 +157,25 @@ esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
                     char* result = cJSON_Print(first_account);
                     if(result) {
                         snprintf(plaid_response, sizeof(plaid_response), "%s", result);
-                        ESP_LOGI(PLAID_TAG, "EVENT FINISH: %s", plaid_response);
                         free(result);
                     } else {
                         ESP_LOGE(PLAID_TAG, "No First Account");
                         cJSON_Delete(root);
                     }
 
-                    cJSON_Delete(root);
-//                    cJSON_ArrayForEach(account, accounts) {
-//                        cJSON* name = cJSON_GetObjectItem(account, "name");
-//                        cJSON* balance = cJSON_GetObjectItem(account, "balances");
-//                        if (cJSON_IsString(name) && cJSON_IsObject(balance)) {
-//                            cJSON* available = cJSON_GetObjectItem(balance, "available");
-//                            cJSON* current = cJSON_GetObjectItem(balance, "current");
-//
-//                            ESP_LOGI("Plaid Handler", "Account: %s", name->valuestring);
-//                            ESP_LOGI("Plaid Handler", "Available Balance: %.2f", cJSON_IsNumber(available) ? available->valuedouble : 0.0);
-//                            ESP_LOGI("Plaid Handler", "Current Balance: %.2f", cJSON_IsNumber(current) ? current->valuedouble : 0.0);
-//                        }
-//                    }
+                    cJSON* account;
+                    cJSON_ArrayForEach(account, accounts) {
+                        cJSON* name = cJSON_GetObjectItem(account, "name");
+                        cJSON* balance = cJSON_GetObjectItem(account, "balances");
+                        if (cJSON_IsString(name) && cJSON_IsObject(balance)) {
+                            cJSON* available = cJSON_GetObjectItem(balance, "available");
+                            cJSON* current = cJSON_GetObjectItem(balance, "current");
+
+                            ESP_LOGI("Plaid Handler", "Account: %s", name->valuestring);
+                            ESP_LOGI("Plaid Handler", "Available Balance: %.2f", cJSON_IsNumber(available) ? available->valuedouble : 0.0);
+                            ESP_LOGI("Plaid Handler", "Current Balance: %.2f", cJSON_IsNumber(current) ? current->valuedouble : 0.0);
+                        }
+                    }
                 } else {
                     ESP_LOGE("Plaid Handler", "No 'accounts' array found in response");
                 }
@@ -204,12 +204,13 @@ esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
 
 char* plaid_fetch_data(const char* access_token) {
     esp_http_client_config_t config = {
-            .host = "sandbox.plaid.com",
-            .url = "https://sandbox.plaid.com/accounts/balance/get",
+            .host = "production.plaid.com",
+            .url = "https://production.plaid.com/accounts/balance/get",
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             .cert_pem = PLAID_ROOT_CERT,
             .skip_cert_common_name_check = true,
             .event_handler = plaid_http_handler, // Assign event handler
+            .timeout_ms = 6000
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);

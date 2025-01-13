@@ -208,13 +208,12 @@ void app_main(void) {
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
 
-    const char* access_token = "access-sandbox-b10ba2bc-9c23-4ed7-8665-a6554ecdd5b3";
-    plaid_fetch_data(access_token);
-//    if(json_response) {
-//        ESP_LOGI(TAG, "MAIN CODE: %s", json_response);
-//    } else {
-//        ESP_LOGE(TAG, "Failed to fetch data from Plaid");
-//    }
+    char* json_response = plaid_fetch_data(access_token);
+    if(json_response) {
+        ESP_LOGI(TAG, "MAIN CODE: %s", json_response);
+    } else {
+        ESP_LOGE(TAG, "Failed to fetch data from Plaid");
+    }
 
     // From here, the _Noreturn void lvgl_task() will run until the system is powered off.
 }
