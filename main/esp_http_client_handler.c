@@ -7,12 +7,11 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include <string.h>
-#include "nvs_flash.h"
+#include "env.h"
 
 // Define a TAG specific to the HTTP module
 static const char *TAG = "HTTP_CLIENT";
 static const char *PLAID_TAG = "Plaid Tag";
-
 
 // Buffer to hold the HTTP response data
 static char response_buffer[1024];
@@ -91,7 +90,8 @@ const char* fetch_time() {
 
 
 // --------------------------------------------------  Plaid Sandbox  --------------------------------------------------
-static char plaid_response[1024];
+static char* plaid_response;
+static char* institution_temp = NULL;
 
 static const char *PLAID_ROOT_CERT =
         "-----BEGIN CERTIFICATE-----\n"
@@ -117,7 +117,7 @@ static const char *PLAID_ROOT_CERT =
         "MrY=\n"
         "-----END CERTIFICATE-----\n";
 
-esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
+esp_err_t plaid_balance_handler(esp_http_client_event_t* evt) {
     static char* plaid_handler_buffer = NULL; // Buffer to accumulate the response
     static int response_buffer_len = 0;
 
@@ -143,39 +143,34 @@ esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
             break;
 
         case HTTP_EVENT_ON_FINISH:
-            ESP_LOGI("Plaid Handler", "HTTP response finished. Total response size: %d bytes", response_buffer_len);
-//            ESP_LOGI("Plaid Handler", "Response: %s", response_buffer);
+//            ESP_LOGI(PLAID_TAG, "HTTP response finished. Total response size: %d bytes", response_buffer_len);
+//            ESP_LOGI(PLAID_TAG, "Response: %s", response_buffer);
 
             // Parse and process the JSON response
             cJSON* root = cJSON_Parse(plaid_handler_buffer);
             if (root) {
-                ESP_LOGI(PLAID_TAG, "%s", cJSON_Print(root));
+//                ESP_LOGI(PLAID_TAG, "%s", cJSON_Print(root));
                 // Handle JSON (similar to the earlier example)
                 cJSON* accounts = cJSON_GetObjectItem(root, "accounts");
                 if (cJSON_IsArray(accounts)) {
-                    cJSON* first_account = cJSON_GetArrayItem(accounts, 0);
-                    char* result = cJSON_Print(first_account);
-                    if(result) {
-                        snprintf(plaid_response, sizeof(plaid_response), "%s", result);
-                        free(result);
-                    } else {
-                        ESP_LOGE(PLAID_TAG, "No First Account");
-                        cJSON_Delete(root);
-                    }
-
+                    cJSON* account_array = cJSON_CreateArray(); // Create an array to hold accounts in JSON
                     cJSON* account;
                     cJSON_ArrayForEach(account, accounts) {
                         cJSON* name = cJSON_GetObjectItem(account, "name");
                         cJSON* balance = cJSON_GetObjectItem(account, "balances");
                         if (cJSON_IsString(name) && cJSON_IsObject(balance)) {
-                            cJSON* available = cJSON_GetObjectItem(balance, "available");
                             cJSON* current = cJSON_GetObjectItem(balance, "current");
 
-                            ESP_LOGI("Plaid Handler", "Account: %s", name->valuestring);
-                            ESP_LOGI("Plaid Handler", "Available Balance: %.2f", cJSON_IsNumber(available) ? available->valuedouble : 0.0);
-                            ESP_LOGI("Plaid Handler", "Current Balance: %.2f", cJSON_IsNumber(current) ? current->valuedouble : 0.0);
+                            cJSON *account_object = cJSON_CreateObject(); // single account object
+                            cJSON_AddStringToObject(account_object, "Institution", institution_temp);
+                            cJSON_AddStringToObject(account_object, "Account", name->valuestring);
+                            cJSON_AddNumberToObject(account_object, "Balance", cJSON_IsNumber(current) ? current->valuedouble : 0.0);
+
+                            cJSON_AddItemToArray(account_array, account_object);
                         }
                     }
+                    plaid_response = cJSON_PrintUnformatted(account_array);
+                    cJSON_Delete(account_array);
                 } else {
                     ESP_LOGE("Plaid Handler", "No 'accounts' array found in response");
                 }
@@ -202,15 +197,21 @@ esp_err_t plaid_http_handler(esp_http_client_event_t* evt) {
 }
 
 
-char* plaid_fetch_data(const char* access_token) {
+char* plaid_fetch_balance(const char* access_token, const char* institution) {
+    institution_temp = strdup(institution);
+    if(!institution_temp) {
+        ESP_LOGE(PLAID_TAG, "Failed to copy institution to the temp var");
+        return NULL;
+    }
+
     esp_http_client_config_t config = {
             .host = "production.plaid.com",
             .url = "https://production.plaid.com/accounts/balance/get",
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             .cert_pem = PLAID_ROOT_CERT,
             .skip_cert_common_name_check = true,
-            .event_handler = plaid_http_handler, // Assign event handler
-            .timeout_ms = 6000
+            .event_handler = plaid_balance_handler, // Assign event handler
+            .timeout_ms = 8000
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -224,7 +225,7 @@ char* plaid_fetch_data(const char* access_token) {
     // Set POST data
     char post_data[512];
     snprintf(post_data, sizeof(post_data),
-             "{\"client_id\":\"%s\",\"secret\":\"%s\",\"access_token\":\"%s\"}",
+             "{\"client_id\":\"%s\",\"secret\":\"%s\",\"access_token\":\"%s\", \"options\": { \"min_last_updated_datetime\": \"2025-01-09T00:00:00Z\" }}",
              PLAID_CLIENT_ID, PLAID_SECRET, access_token);
     esp_http_client_set_method(client, HTTP_METHOD_POST);
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
@@ -236,6 +237,9 @@ char* plaid_fetch_data(const char* access_token) {
     }
 
     esp_http_client_cleanup(client);
-
+    if(institution_temp) {
+        free(institution_temp);
+        institution_temp = NULL;
+    }
     return(plaid_response);
 }

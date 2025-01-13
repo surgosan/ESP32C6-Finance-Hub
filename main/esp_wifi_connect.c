@@ -7,10 +7,9 @@
 #include "nvs_flash.h"
 #include "esp_wifi_connect.h"
 #include "freertos/event_groups.h"
+#include "env.h"
 
 // Wifi Config
-#define WIFI_SSID "NETGEAR17"
-#define WIFI_PASS "Rosselin06"
 #define WIFI_MAX_RETRY 5 // The max amount of wifi connect retries before it throws an error
 
 static EventGroupHandle_t s_wifi_event_group; // Handles the event and its responses
@@ -50,12 +49,13 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 
 // Initializes the WiFi library and handlers. WiFi functions will not work without this
 void wifi_init(void) {
+/*  // Uncomment this if not already in main code
     esp_err_t ret = nvs_flash_init();
     if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
     }
-
+*/
     ESP_LOGI(WIFI_TAG, "Initializing WIFI...");
     ESP_ERROR_CHECK(esp_netif_init());
     // Set network setting to station (connect to another source)

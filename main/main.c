@@ -3,7 +3,9 @@
 //
 #include <stdio.h>
 #include <esp_timer.h>
+#include <string.h>
 #include <esp_log.h>
+#include <nvs_flash.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
@@ -17,6 +19,7 @@
 #include "esp_lcd_ili9341.h"
 #include "esp_wifi_connect.h"
 #include "esp_http_client_handler.h"
+#include "env.h"
 
 #define BL 15
 #define SCK 6
@@ -31,6 +34,7 @@ static uint16_t buffer[240 * 20];
 static uint16_t buffer2[240 * 20];
 static esp_lcd_panel_handle_t panel_handle;
 
+// ------------------------------------------- Plaid Vars -------------------------------------------
 static const char *TAG = "Plaid API";
 // ------------------------------------------ LVGL Objects ------------------------------------------
 static lv_obj_t *home;
@@ -40,6 +44,10 @@ static lv_obj_t *counter_label;
 static int counter = 0;
 
 static lv_obj_t *time_label;
+
+static lv_style_t bar_style_bg;
+static lv_style_t bar_style_indic;
+static lv_obj_t *api_progress_label;
 // -----------------------------------------  API Functions  ------------------------------------------
 
 // Updates time label
@@ -65,11 +73,18 @@ static void counter_update_cb() {
     lv_label_set_text(counter_label, timer_buffer);
 }
 
+static void delete_progress_bar() {
+    if(api_progress_label) {
+        lv_obj_delete(api_progress_label);
+        api_progress_label = NULL;
+    }
+}
+
 // Main LVGL task that will run indefinitely (Like void loop() in arduino)
 _Noreturn void lvgl_task() {
     while(true) {
         lv_timer_handler();
-        vTaskDelay(pdMS_TO_TICKS(15));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 
@@ -78,6 +93,11 @@ _Noreturn void lvgl_task() {
 // Main application setup
 void app_main(void) {
     printf("Starting Application\n");
+    esp_err_t ret = nvs_flash_init();
+    if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ESP_ERROR_CHECK(nvs_flash_init());
+    }
 // -------------------------------------------  Wi-Fi  -------------------------------------------
     // Call function to init Wi-Fi
     wifi_init();
@@ -182,11 +202,39 @@ void app_main(void) {
     lv_obj_set_style_bg_color(home, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
 
-    // Hello World Label
-    lv_obj_t *totalBalance = lv_label_create(home);
-    lv_label_set_text(totalBalance, LV_SYMBOL_WIFI "Fetching Balance...\n");
-    lv_obj_set_style_text_color(totalBalance, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(totalBalance, LV_ALIGN_CENTER, 0, 0);
+    // Credit Cards Balance
+    lv_obj_t *total_credit_balance_label = lv_label_create(home);
+    lv_label_set_text(total_credit_balance_label, LV_SYMBOL_WIFI " Fetching Credit Accounts...");
+    lv_obj_set_style_text_color(total_credit_balance_label, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(total_credit_balance_label, LV_ALIGN_CENTER, 0, 0);
+
+    // Checking Accounts Balance
+    lv_obj_t *total_checking_balance_label = lv_label_create(home);
+    lv_label_set_text(total_checking_balance_label, LV_SYMBOL_WIFI " Fetching Checking Accounts...");
+    lv_obj_set_style_text_color(total_checking_balance_label, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(total_checking_balance_label, LV_ALIGN_CENTER, 0, 40);
+
+    // Fetching Progress Label Styles
+    lv_style_init(&bar_style_bg);
+    lv_style_set_border_color(&bar_style_bg, lv_color_hex(0xffffff));
+    lv_style_set_border_width(&bar_style_bg, 2);
+    lv_style_set_pad_all(&bar_style_bg, 3);
+    lv_style_set_radius(&bar_style_bg, 10);
+    lv_style_set_anim_duration(&bar_style_bg, 1000);
+
+    lv_style_init(&bar_style_indic);
+    lv_style_set_bg_opa(&bar_style_indic, LV_OPA_COVER);
+    lv_style_set_bg_color(&bar_style_indic, lv_color_hex(0x0000ff));
+    lv_style_set_radius(&bar_style_indic, 10);
+    // Fetching Progress Label
+    api_progress_label = lv_bar_create(home);
+    lv_obj_remove_style_all(api_progress_label);
+    lv_obj_add_style(api_progress_label, &bar_style_bg, 0);
+    lv_obj_add_style(api_progress_label, &bar_style_indic, LV_PART_INDICATOR);
+
+    lv_obj_set_size(api_progress_label, 150, 20);
+    lv_bar_set_value(api_progress_label, 0, LV_ANIM_ON);
+    lv_obj_align(api_progress_label, LV_ALIGN_TOP_MID, 0, 10);
 
     // Counter label
     counter_label = lv_label_create(home);
@@ -208,12 +256,95 @@ void app_main(void) {
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
 
-    char* json_response = plaid_fetch_data(access_token);
-    if(json_response) {
-        ESP_LOGI(TAG, "MAIN CODE: %s", json_response);
-    } else {
-        ESP_LOGE(TAG, "Failed to fetch data from Plaid");
+
+// --------------------------------------------  Plaid  --------------------------------------------
+    const char* access_tokens[] = {
+            AMEX_TOKEN,
+            BOFA_TOKEN,
+            CAPONE_TOKEN,
+            "American Express",
+            "Bank of America",
+            "Capital One"
+    };
+    int token_count = sizeof(access_tokens) / sizeof(access_tokens[0]);
+    cJSON* all_accounts = cJSON_CreateArray();
+    double total_credit_balance = 0.0;
+    double total_checking_balance = 0.0;
+
+    // Go over each account and place it in all_accounts
+    for(int i = 0; i < token_count-3; i++) {
+        char* balance_response = plaid_fetch_balance(access_tokens[i], access_tokens[i + 3]);
+        // Visual update on API progress
+        switch(i) {
+            case 0:
+                lv_bar_set_value(api_progress_label, 33, LV_ANIM_ON);
+                break;
+            case 1:
+                lv_bar_set_value(api_progress_label, 66, LV_ANIM_ON);
+                break;
+            case 2:
+                lv_bar_set_value(api_progress_label, 100, LV_ANIM_ON);
+                break;
+            default:
+                lv_bar_set_value(api_progress_label, 0, LV_ANIM_ON);
+                break;
+        }
+        ESP_LOGI(TAG, "Finished %s", access_tokens[i+3]);
+        if(balance_response) {
+//            ESP_LOGI(TAG, "MAIN CODE: %s", balance_response);
+            cJSON* institution_accounts = cJSON_Parse(balance_response);
+            if(institution_accounts) {
+                cJSON* account;
+                cJSON_ArrayForEach(account, institution_accounts) {
+                    cJSON_AddItemToArray(all_accounts, cJSON_Duplicate(account, 1)); // Copy to the new local array
+
+                    // Get the balance & account name.
+                    cJSON* current_balance = cJSON_GetObjectItem(account, "Balance");
+                    cJSON* current_account = cJSON_GetObjectItem(account, "Account");
+
+                    if(cJSON_IsString(current_account) && cJSON_IsNumber(current_balance)) {
+                        // Define account name and balance as appropriate variable types
+                        const char* account_name = cJSON_GetStringValue(current_account);
+                        double balance_double = current_balance->valuedouble;
+
+                        // If it is a checking account, add to checking total, else add to credit total
+                        if(strcmp(account_name, "Advantage Savings") == 0 ||
+                                strcmp(account_name, "Rewards Checking") == 0 ||
+                                strcmp(account_name, "Adv Plus Banking") == 0) {
+                            total_checking_balance += balance_double;
+                        } else {
+                            total_credit_balance += balance_double;
+                        }
+                    } else {
+                        ESP_LOGW(TAG, "Invalid Response");
+                    }
+                }
+                cJSON_Delete(institution_accounts); // Delete temp accounts to free memory
+            }
+            free(balance_response); // Delete response to free memory
+        } else {
+            ESP_LOGE(TAG, "Failed to fetch data from Plaid");
+        }
     }
+
+    char total_credit_balance_string[32];
+    sprintf(total_credit_balance_string, "Credit Balance: $%.2f", total_credit_balance);
+    lv_label_set_text(total_credit_balance_label, total_credit_balance_string);
+
+    char total_checking_balance_string[32];
+    sprintf(total_checking_balance_string, "Checking Balance: $%.f", total_checking_balance);
+    lv_label_set_text(total_checking_balance_label, total_checking_balance_string);
+
+    // Create a one-shot timer with a 5-second delay
+    TimerHandle_t bar_deletion_timer = xTimerCreate(
+            "Delete_Bar_Timer",
+            pdMS_TO_TICKS(5000),
+            pdFALSE,                     // One-shot timer
+            NULL,
+            delete_progress_bar        // Callback function
+    );
+
+    if(bar_deletion_timer != NULL) { xTimerStart(bar_deletion_timer, 0); }
 
     // From here, the _Noreturn void lvgl_task() will run until the system is powered off.
 }

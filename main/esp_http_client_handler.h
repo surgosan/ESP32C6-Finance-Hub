@@ -16,9 +16,10 @@ const char* fetch_time();
 
 /**
  * @brief Get Plaid Data
- * @param access_token Input Plaid Access Token.
+ * @param access_token Access Tokens are unique to institutions
+ * @param institution Name of the institution to get accounts from
  * @return JSON Response
 */
-char* plaid_fetch_data(const char* access_token);
+char* plaid_fetch_balance(const char* access_token, const char* institution);
 
 #endif //ESP32C6_FINANCE_HUB_ESP_HTTP_CLIENT_HANDLER_H
