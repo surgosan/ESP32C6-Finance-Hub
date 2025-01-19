@@ -10,7 +10,7 @@
 #include "env.h"
 
 // Define a TAG specific to the HTTP module
-static const char *TAG = "HTTP_CLIENT";
+static const char *TIME_TAG = "HTTP_CLIENT";
 static const char *PLAID_TAG = "Plaid Tag";
 
 // Buffer to hold the HTTP response data
@@ -18,46 +18,107 @@ static char response_buffer[1024];
 static int data_len = 0;
 
 // -----------------------------------------------------  Time API  -----------------------------------------------------
+static const char* time_api_pem =
+        "-----BEGIN CERTIFICATE-----\n"
+        "MIIF3jCCA8agAwIBAgIQAf1tMPyjylGoG7xkDjUDLTANBgkqhkiG9w0BAQwFADCB\n"
+        "iDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0pl\n"
+        "cnNleSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNV\n"
+        "BAMTJVVTRVJUcnVzdCBSU0EgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMTAw\n"
+        "MjAxMDAwMDAwWhcNMzgwMTE4MjM1OTU5WjCBiDELMAkGA1UEBhMCVVMxEzARBgNV\n"
+        "BAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVU\n"
+        "aGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVzdCBSU0EgQ2Vy\n"
+        "dGlmaWNhdGlvbiBBdXRob3JpdHkwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIK\n"
+        "AoICAQCAEmUXNg7D2wiz0KxXDXbtzSfTTK1Qg2HiqiBNCS1kCdzOiZ/MPans9s/B\n"
+        "3PHTsdZ7NygRK0faOca8Ohm0X6a9fZ2jY0K2dvKpOyuR+OJv0OwWIJAJPuLodMkY\n"
+        "tJHUYmTbf6MG8YgYapAiPLz+E/CHFHv25B+O1ORRxhFnRghRy4YUVD+8M/5+bJz/\n"
+        "Fp0YvVGONaanZshyZ9shZrHUm3gDwFA66Mzw3LyeTP6vBZY1H1dat//O+T23LLb2\n"
+        "VN3I5xI6Ta5MirdcmrS3ID3KfyI0rn47aGYBROcBTkZTmzNg95S+UzeQc0PzMsNT\n"
+        "79uq/nROacdrjGCT3sTHDN/hMq7MkztReJVni+49Vv4M0GkPGw/zJSZrM233bkf6\n"
+        "c0Plfg6lZrEpfDKEY1WJxA3Bk1QwGROs0303p+tdOmw1XNtB1xLaqUkL39iAigmT\n"
+        "Yo61Zs8liM2EuLE/pDkP2QKe6xJMlXzzawWpXhaDzLhn4ugTncxbgtNMs+1b/97l\n"
+        "c6wjOy0AvzVVdAlJ2ElYGn+SNuZRkg7zJn0cTRe8yexDJtC/QV9AqURE9JnnV4ee\n"
+        "UB9XVKg+/XRjL7FQZQnmWEIuQxpMtPAlR1n6BB6T1CZGSlCBst6+eLf8ZxXhyVeE\n"
+        "Hg9j1uliutZfVS7qXMYoCAQlObgOK6nyTJccBz8NUvXt7y+CDwIDAQABo0IwQDAd\n"
+        "BgNVHQ4EFgQUU3m/WqorSs9UgOHYm8Cd8rIDZsswDgYDVR0PAQH/BAQDAgEGMA8G\n"
+        "A1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQEMBQADggIBAFzUfA3P9wF9QZllDHPF\n"
+        "Up/L+M+ZBn8b2kMVn54CVVeWFPFSPCeHlCjtHzoBN6J2/FNQwISbxmtOuowhT6KO\n"
+        "VWKR82kV2LyI48SqC/3vqOlLVSoGIG1VeCkZ7l8wXEskEVX/JJpuXior7gtNn3/3\n"
+        "ATiUFJVDBwn7YKnuHKsSjKCaXqeYalltiz8I+8jRRa8YFWSQEg9zKC7F4iRO/Fjs\n"
+        "8PRF/iKz6y+O0tlFYQXBl2+odnKPi4w2r78NBc5xjeambx9spnFixdjQg3IM8WcR\n"
+        "iQycE0xyNN+81XHfqnHd4blsjDwSXWXavVcStkNr/+XeTWYRUc+ZruwXtuhxkYze\n"
+        "Sf7dNXGiFSeUHM9h4ya7b6NnJSFd5t0dCy5oGzuCr+yDZ4XUmFF0sbmZgIn/f3gZ\n"
+        "XHlKYC6SQK5MNyosycdiyA5d9zZbyuAlJQG03RoHnHcAP9Dc1ew91Pq7P8yF1m9/\n"
+        "qS3fuQL39ZeatTXaw2ewh0qpKJ4jjv9cJ2vhsE/zB+4ALtRZh8tSQZXq9EfX7mRB\n"
+        "VXyNWQKV3WKdwrnuWih0hKWbt5DHDAff9Yk2dDLWKMGwsAvgnEzDHNb842m1R0aB\n"
+        "L6KCq9NjRHDEjf8tM7qtj3u1cIiuPhnPQCjY/MiQu12ZIvVS5ljFH4gxQ+6IHdfG\n"
+        "jjxDah2nGN59PRbxYvnKkKj9\n"
+        "-----END CERTIFICATE-----";
+
 // Buffer to hold the parsed time (static for simplicity)
-static char time_buffer[32];
+static char time_buffer[2][32];
 // Event handler for HTTP client
 esp_err_t time_handler(esp_http_client_event_t *event) {
     switch (event->event_id) {
         case HTTP_EVENT_ON_DATA:
-            if (!esp_http_client_is_chunked_response(event->client)) {
-                if (data_len + event->data_len < sizeof(response_buffer)) {
-                    memcpy(response_buffer + data_len, event->data, event->data_len);
-                    data_len += event->data_len;
-                    response_buffer[data_len] = '\0'; // Null-terminate the buffer
-                }
+//            ESP_LOGI(TIME_TAG, "Received data chunk: %.*s", event->data_len, (char *)event->data);
+            // Append the received chunk to the buffer
+            if (data_len + event->data_len < sizeof(response_buffer)) {
+                memcpy(response_buffer + data_len, event->data, event->data_len);
+                data_len += event->data_len;
+                response_buffer[data_len] = '\0'; // Null-terminate the buffer
+            } else {
+                ESP_LOGE(TIME_TAG, "Response buffer overflow! Increase the buffer size.");
             }
             break;
 
         case HTTP_EVENT_ON_FINISH:
+//            ESP_LOGI(TAG, "Response Buffer: %s", response_buffer);
+            int status_code = esp_http_client_get_status_code(event->client);
+            ESP_LOGI(TIME_TAG, "TimeIO Status: %d", status_code);
             cJSON *json = cJSON_Parse(response_buffer);
-            if (json) {
-                const cJSON *jsonResult = cJSON_GetObjectItem(json, "week_number");
-                if (cJSON_IsString(jsonResult)) {
-                    strncpy(time_buffer, jsonResult->valuestring, sizeof(time_buffer) - 1);
-                    time_buffer[sizeof(time_buffer) - 1] = '\0'; // Null-terminate
-                } else if (cJSON_IsNumber(jsonResult)) {
-                    snprintf(time_buffer, sizeof(time_buffer), "%d", jsonResult->valueint);
+            if (json) { // If responded with JSON response
+                const cJSON *date_result = cJSON_GetObjectItem(json, "date");
+                const cJSON *day_result = cJSON_GetObjectItem(json, "dayOfWeek");
+
+                if(cJSON_IsString(date_result)) {
+                    strncpy(time_buffer[0], date_result->valuestring, sizeof(time_buffer[0]) - 1);
+                    time_buffer[0][sizeof(time_buffer[0]) - 1] = '\0';
                 } else {
-                    strncpy(time_buffer, "Invalid Time", sizeof(time_buffer) - 1);
-                    time_buffer[sizeof(time_buffer) - 1] = '\0';
+                    strncpy(time_buffer[0], "Invalid Date", sizeof(time_buffer[0]) - 1);
+                    time_buffer[0][sizeof(time_buffer[0]) - 1] = '\0';
                 }
+
+                // Extract "dayOfWeek" from JSON
+                if (cJSON_IsString(day_result)) {
+                    strncpy(time_buffer[1], day_result->valuestring, sizeof(time_buffer[1]) - 1);
+                    time_buffer[1][sizeof(time_buffer[1]) - 1] = '\0'; // Null-terminate
+                } else {
+                    strncpy(time_buffer[1], "Invalid Day", sizeof(time_buffer[1]) - 1);
+                    time_buffer[1][sizeof(time_buffer[1]) - 1] = '\0';
+                }
+
+//                if (cJSON_IsString(date_result)) {
+//                    strncpy(time_buffer[0], date_result->valuestring, sizeof(time_buffer) - 1);
+//                    time_buffer[sizeof(time_buffer) - 1] = '\0'; // Null-terminate
+//                } else if (cJSON_IsNumber(date_result)) {
+//                    snprintf(time_buffer[0], sizeof(time_buffer), "%d", date_result->valueint);
+//                } else {
+//                    strncpy(time_buffer[0], "Invalid Time", sizeof(time_buffer) - 1);
+//                    time_buffer[sizeof(time_buffer) - 1] = '\0';
+//                }
                 cJSON_Delete(json);
             } else {
-                strncpy(time_buffer, "JSON Parse Error", sizeof(time_buffer) - 1);
-                time_buffer[sizeof(time_buffer) - 1] = '\0';
+                ESP_LOGE(TIME_TAG, "Failed to parse JSON response.");
+                strncpy(time_buffer[0], "JSON Parse Error", sizeof(time_buffer[0]) - 1);
+                strncpy(time_buffer[1], "", sizeof(time_buffer[1]) - 1);
             }
             data_len = 0; // Reset data length for the next request
             break;
 
         case HTTP_EVENT_ERROR:
-            ESP_LOGE(TAG, "HTTP_EVENT_ERROR");
-            strncpy(time_buffer, "HTTP Error", sizeof(time_buffer) - 1);
-            time_buffer[sizeof(time_buffer) - 1] = '\0';
+            ESP_LOGE(TIME_TAG, "HTTP_EVENT_ERROR");
+            strncpy(time_buffer[0], "HTTP Error", sizeof(time_buffer[0]) - 1);
+            strncpy(time_buffer[1], "", sizeof(time_buffer[1]) - 1);
             break;
 
         default:
@@ -67,21 +128,30 @@ esp_err_t time_handler(esp_http_client_event_t *event) {
 }
 
 // Function to fetch time and return it as a string
-const char* fetch_time() {
+char (*fetch_time())[32] {
     esp_http_client_config_t config = {
-            .url = "http://worldtimeapi.org/api/timezone/America/New_York",
+            .url = "https://www.timeapi.io/api/time/current/zone?timeZone=America%2FNew_York",
             .event_handler = time_handler,
+            .transport_type = HTTP_TRANSPORT_OVER_SSL,
+            .cert_pem = time_api_pem,
+            .skip_cert_common_name_check = false,
+            .method = HTTP_METHOD_GET,
+            .timeout_ms = 2000,
+            .keep_alive_enable = true
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
+    esp_http_client_set_header(client, "Content-Type", "application/json");
     esp_err_t err = esp_http_client_perform(client);
 
     if (err == ESP_OK) {
-        ESP_LOGI(TAG, "HTTP GET Success");
+        ESP_LOGI(TIME_TAG, "ESP Performed Time API");
+        ESP_LOGI(TIME_TAG, "Time Buffer[0]: %s", time_buffer[0]);
+        ESP_LOGI(TIME_TAG, "Time Buffer[1]: %s", time_buffer[1]);
     } else {
-        ESP_LOGE(TAG, "HTTP GET Failed");
-        strncpy(time_buffer, "HTTP Request Failed", sizeof(time_buffer) - 1);
-        time_buffer[sizeof(time_buffer) - 1] = '\0';
+        ESP_LOGE(TIME_TAG, "ESP Failed Time API");
+        strncpy(time_buffer[0], "ESP Failed Time API", sizeof(time_buffer[0]) - 1);
+        strncpy(time_buffer[1], "", sizeof(time_buffer[1]) - 1);
     }
 
     esp_http_client_cleanup(client); // Free up memory
@@ -209,7 +279,7 @@ char* plaid_fetch_balance(const char* access_token, const char* institution) {
             .url = "https://production.plaid.com/accounts/balance/get",
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             .cert_pem = PLAID_ROOT_CERT,
-            .skip_cert_common_name_check = true,
+            .skip_cert_common_name_check = false,
             .event_handler = plaid_balance_handler, // Assign event handler
             .timeout_ms = 8000
     };

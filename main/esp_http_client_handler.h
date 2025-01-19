@@ -12,7 +12,7 @@
  * @brief Fetch time from a remote API and return it as a string
  * @return Pointer to a static buffer containing the time or error message
  */
-const char* fetch_time();
+char (*fetch_time())[32];
 
 /**
  * @brief Get Plaid Data

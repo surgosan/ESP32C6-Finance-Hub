@@ -19,7 +19,8 @@
 #include "esp_lcd_ili9341.h"
 #include "esp_wifi_connect.h"
 #include "esp_http_client_handler.h"
-#include "env.h"
+//#include "semaphore_util.h"
+//#include "env.h"
 
 #define BL 15
 #define SCK 6
@@ -29,14 +30,14 @@
 #define RST 22
 #define DC 21
 
+// ------------------------------------------- Plaid Vars -------------------------------------------
+static const char *TAG = "Plaid API";
+
+// ------------------------------------------ LVGL Objects ------------------------------------------
 // Declare buffer as a global variable
 static uint16_t buffer[240 * 20];
 static uint16_t buffer2[240 * 20];
 static esp_lcd_panel_handle_t panel_handle;
-
-// ------------------------------------------- Plaid Vars -------------------------------------------
-static const char *TAG = "Plaid API";
-// ------------------------------------------ LVGL Objects ------------------------------------------
 static lv_obj_t *home;
 static lv_obj_t *second;
 
@@ -47,13 +48,19 @@ static lv_obj_t *time_label;
 
 static lv_style_t bar_style_bg;
 static lv_style_t bar_style_indic;
+static lv_style_t nav_style;
 static lv_obj_t *api_progress_label;
 // -----------------------------------------  API Functions  ------------------------------------------
 
 // Updates time label
 void update_time() {
     char displayString[20];
-    sprintf(displayString, "Year: 2025\n Week: %s", fetch_time());
+    char (*time_api)[32] = fetch_time();
+    vTaskDelay(pdMS_TO_TICKS(200));
+    ESP_LOGI("Time Function", "Back to Main");
+    ESP_LOGI("Time Function", "Time Buffer[0]: %s", time_api[0]);
+    ESP_LOGI("Time Function", "Time Buffer[1]: %s", time_api[1]);
+    sprintf(displayString, "%s\n%s", time_api[0], time_api[1]);
     lv_label_set_text(time_label, displayString);
 }
 // ------------------------------------------ LVGL Functions ------------------------------------------
@@ -101,6 +108,7 @@ void app_main(void) {
 // -------------------------------------------  Wi-Fi  -------------------------------------------
     // Call function to init Wi-Fi
     wifi_init();
+
 // ------------------------------------------  SPI Bus  ------------------------------------------
     // Config the SPI bus
     spi_bus_config_t busConfig = {
@@ -202,39 +210,53 @@ void app_main(void) {
     lv_obj_set_style_bg_color(home, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
 
+    // Nav bar style
+    lv_style_init(&nav_style);
+    lv_style_set_pad_hor(&nav_style, 4);
+    lv_style_set_pad_ver(&nav_style, 8);
+    lv_style_set_radius(&nav_style, 0);
+    lv_style_set_size(&nav_style, 320, 50);
+    lv_style_set_bg_opa(&nav_style, LV_OPA_COVER);
+    lv_style_set_bg_color(&nav_style, lv_color_hex(0xff0000));
+    lv_style_set_border_width(&nav_style, 0);
+    // Nav bar
+    lv_obj_t *nav_bar = lv_obj_create(home);
+    lv_obj_align(nav_bar, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_add_style(nav_bar, &nav_style, 0);
+
     // Credit Cards Balance
     lv_obj_t *total_credit_balance_label = lv_label_create(home);
-    lv_label_set_text(total_credit_balance_label, LV_SYMBOL_WIFI " Fetching Credit Accounts...");
+    lv_label_set_text(total_credit_balance_label, LV_SYMBOL_WIFI " Credit");
     lv_obj_set_style_text_color(total_credit_balance_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(total_credit_balance_label, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(total_credit_balance_label, LV_ALIGN_LEFT_MID, 0, 0);
 
     // Checking Accounts Balance
     lv_obj_t *total_checking_balance_label = lv_label_create(home);
-    lv_label_set_text(total_checking_balance_label, LV_SYMBOL_WIFI " Fetching Checking Accounts...");
+    lv_label_set_text(total_checking_balance_label, LV_SYMBOL_WIFI " Checking");
     lv_obj_set_style_text_color(total_checking_balance_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(total_checking_balance_label, LV_ALIGN_CENTER, 0, 40);
+    lv_obj_align(total_checking_balance_label, LV_ALIGN_RIGHT_MID, 0, 40);
 
     // Fetching Progress Label Styles
+    // Bar Background Style
     lv_style_init(&bar_style_bg);
     lv_style_set_border_color(&bar_style_bg, lv_color_hex(0xffffff));
     lv_style_set_border_width(&bar_style_bg, 2);
     lv_style_set_pad_all(&bar_style_bg, 3);
     lv_style_set_radius(&bar_style_bg, 10);
-    lv_style_set_anim_duration(&bar_style_bg, 1000);
-
+    lv_style_set_anim_duration(&bar_style_bg, 1500);
+    // Bar Indicator Style
     lv_style_init(&bar_style_indic);
     lv_style_set_bg_opa(&bar_style_indic, LV_OPA_COVER);
     lv_style_set_bg_color(&bar_style_indic, lv_color_hex(0x0000ff));
     lv_style_set_radius(&bar_style_indic, 10);
-    // Fetching Progress Label
+    // Bar Label
     api_progress_label = lv_bar_create(home);
     lv_obj_remove_style_all(api_progress_label);
     lv_obj_add_style(api_progress_label, &bar_style_bg, 0);
     lv_obj_add_style(api_progress_label, &bar_style_indic, LV_PART_INDICATOR);
-
     lv_obj_set_size(api_progress_label, 150, 20);
     lv_bar_set_value(api_progress_label, 0, LV_ANIM_ON);
-    lv_obj_align(api_progress_label, LV_ALIGN_TOP_MID, 0, 10);
+    lv_obj_align(api_progress_label, LV_ALIGN_CENTER, 0, 10);
 
     // Counter label
     counter_label = lv_label_create(home);
@@ -258,6 +280,7 @@ void app_main(void) {
 
 
 // --------------------------------------------  Plaid  --------------------------------------------
+/*
     const char* access_tokens[] = {
             AMEX_TOKEN,
             BOFA_TOKEN,
@@ -347,4 +370,5 @@ void app_main(void) {
     if(bar_deletion_timer != NULL) { xTimerStart(bar_deletion_timer, 0); }
 
     // From here, the _Noreturn void lvgl_task() will run until the system is powered off.
+*/
 }
