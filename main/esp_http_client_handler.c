@@ -60,7 +60,6 @@ static char time_buffer[2][32];
 esp_err_t time_handler(esp_http_client_event_t *event) {
     switch (event->event_id) {
         case HTTP_EVENT_ON_DATA:
-//            ESP_LOGI(TIME_TAG, "Received data chunk: %.*s", event->data_len, (char *)event->data);
             // Append the received chunk to the buffer
             if (data_len + event->data_len < sizeof(response_buffer)) {
                 memcpy(response_buffer + data_len, event->data, event->data_len);
@@ -72,7 +71,6 @@ esp_err_t time_handler(esp_http_client_event_t *event) {
             break;
 
         case HTTP_EVENT_ON_FINISH:
-//            ESP_LOGI(TAG, "Response Buffer: %s", response_buffer);
             int status_code = esp_http_client_get_status_code(event->client);
             ESP_LOGI(TIME_TAG, "TimeIO Status: %d", status_code);
             cJSON *json = cJSON_Parse(response_buffer);
@@ -96,16 +94,6 @@ esp_err_t time_handler(esp_http_client_event_t *event) {
                     strncpy(time_buffer[1], "Invalid Day", sizeof(time_buffer[1]) - 1);
                     time_buffer[1][sizeof(time_buffer[1]) - 1] = '\0';
                 }
-
-//                if (cJSON_IsString(date_result)) {
-//                    strncpy(time_buffer[0], date_result->valuestring, sizeof(time_buffer) - 1);
-//                    time_buffer[sizeof(time_buffer) - 1] = '\0'; // Null-terminate
-//                } else if (cJSON_IsNumber(date_result)) {
-//                    snprintf(time_buffer[0], sizeof(time_buffer), "%d", date_result->valueint);
-//                } else {
-//                    strncpy(time_buffer[0], "Invalid Time", sizeof(time_buffer) - 1);
-//                    time_buffer[sizeof(time_buffer) - 1] = '\0';
-//                }
                 cJSON_Delete(json);
             } else {
                 ESP_LOGE(TIME_TAG, "Failed to parse JSON response.");
@@ -146,8 +134,6 @@ char (*fetch_time())[32] {
 
     if (err == ESP_OK) {
         ESP_LOGI(TIME_TAG, "ESP Performed Time API");
-        ESP_LOGI(TIME_TAG, "Time Buffer[0]: %s", time_buffer[0]);
-        ESP_LOGI(TIME_TAG, "Time Buffer[1]: %s", time_buffer[1]);
     } else {
         ESP_LOGE(TIME_TAG, "ESP Failed Time API");
         strncpy(time_buffer[0], "ESP Failed Time API", sizeof(time_buffer[0]) - 1);

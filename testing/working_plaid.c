@@ -1,5 +1,5 @@
 //
-// Created by sergy on 1/9/2025.
+// Created by sergy on 1/18/2025.
 //
 #include <stdio.h>
 #include <esp_timer.h>
@@ -49,7 +49,6 @@ static lv_obj_t *time_label;
 static lv_style_t bar_style_bg;
 static lv_style_t bar_style_indic;
 static lv_style_t nav_style;
-static lv_style_t style_temp;
 static lv_obj_t *api_progress_label;
 // -----------------------------------------  API Functions  ------------------------------------------
 
@@ -105,7 +104,7 @@ void app_main(void) {
     }
 // -------------------------------------------  Wi-Fi  -------------------------------------------
     // Call function to init Wi-Fi
-//    wifi_init();
+    wifi_init();
 
 // ------------------------------------------  SPI Bus  ------------------------------------------
     // Config the SPI bus
@@ -190,7 +189,6 @@ void app_main(void) {
     lv_display_t *display = lv_display_create(320, 240);
     // Define screen color format
     lv_display_set_color_format(display, LV_COLOR_FORMAT_RGB565);
-
     // Set LVGL Buffers (2 buffers for smooth and consistent display)
     lv_display_set_buffers(display, buffer, buffer2, sizeof(buffer), LV_DISPLAY_RENDER_MODE_PARTIAL);
     // Set LVGL draw (flush) callback
@@ -209,69 +207,20 @@ void app_main(void) {
     lv_obj_set_style_bg_color(home, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_color(second, lv_color_hex(0x000000), LV_PART_MAIN);
 
-//-----------------------------------------------------  NAV BAR  -----------------------------------------------------
     // Nav bar style
     lv_style_init(&nav_style);
     lv_style_set_pad_hor(&nav_style, 4);
     lv_style_set_pad_ver(&nav_style, 8);
     lv_style_set_radius(&nav_style, 0);
-    lv_style_set_size(&nav_style, 320, 40);
+    lv_style_set_size(&nav_style, 320, 50);
     lv_style_set_bg_opa(&nav_style, LV_OPA_COVER);
-    lv_style_set_bg_color(&nav_style, lv_color_hex(0x0000ff));
+    lv_style_set_bg_color(&nav_style, lv_color_hex(0xff0000));
     lv_style_set_border_width(&nav_style, 0);
     // Nav bar
     lv_obj_t *nav_bar = lv_obj_create(home);
     lv_obj_align(nav_bar, LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_add_style(nav_bar, &nav_style, 0);
 
-    // Counter label
-    counter_label = lv_label_create(nav_bar);
-    lv_label_set_text(counter_label, "Count: 0");
-    lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(counter_label, LV_ALIGN_LEFT_MID, 0, 0);
-
-    //---------------------------  Menu  ---------------------------
-    // Menu style
-    lv_style_init(&style_temp);
-    lv_style_set_pad_hor(&style_temp, 4);
-    lv_style_set_pad_ver(&style_temp, 8);
-    lv_style_set_radius(&style_temp, 0);
-//    lv_style_set_size(&nav_style, 320, 40);
-    lv_style_set_bg_opa(&style_temp, LV_OPA_COVER);
-    lv_style_set_bg_color(&style_temp, lv_color_hex(0xff0000));
-    lv_style_set_border_width(&style_temp, 1);
-// Menu
-    lv_obj_t* menu = lv_obj_create(nav_bar);
-    lv_obj_align(menu, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_style(menu, &style_temp, 0);
-
-    lv_style_reset(&style_temp);
-
-    lv_style_init(&style_temp);
-    lv_style_set_pad_hor(&style_temp, 4);
-    lv_style_set_pad_ver(&style_temp, 8);
-    lv_style_set_radius(&style_temp, 0);
-    lv_style_set_bg_opa(&style_temp, LV_OPA_COVER);
-    lv_style_set_bg_color(&style_temp, lv_color_hex(0x00ff00));
-    lv_style_set_border_width(&style_temp, 1);
-
-// Home Button
-    lv_obj_t* home_button = lv_button_create(menu);
-    lv_obj_align(home_button, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_add_style(home_button, &style_temp, 0);
-
-    lv_obj_t* home_button_label = lv_label_create(home_button);
-    lv_label_set_text(home_button_label, LV_SYMBOL_HOME " Home");
-    lv_obj_set_style_text_color(home_button, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(home_button_label, LV_ALIGN_CENTER, 0, 0);
-
-    // Time label
-    time_label = lv_label_create(nav_bar);
-    lv_label_set_text(time_label, "Fetching...");
-    lv_obj_set_style_text_color(time_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(time_label, LV_ALIGN_RIGHT_MID, 0, 0);
-
-//-------------------------------------------------------  MAIN  -------------------------------------------------------
     // Credit Cards Balance
     lv_obj_t *total_credit_balance_label = lv_label_create(home);
     lv_label_set_text(total_credit_balance_label, LV_SYMBOL_WIFI " Credit");
@@ -306,13 +255,23 @@ void app_main(void) {
     lv_bar_set_value(api_progress_label, 0, LV_ANIM_ON);
     lv_obj_align(api_progress_label, LV_ALIGN_CENTER, 0, 10);
 
+    // Counter label
+    counter_label = lv_label_create(home);
+    lv_label_set_text(counter_label, "Count: 0");
+    lv_obj_set_style_text_color(counter_label, lv_color_hex(0xffffff), LV_PART_MAIN);
 
+    // Time label
+    time_label = lv_label_create(home);
+    lv_label_set_text(time_label, "Fetching...");
+    lv_obj_set_style_text_color(time_label, lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(time_label, LV_ALIGN_TOP_RIGHT, 0, 0);
 
     // Create timer updater
     lv_timer_create(counter_update_cb, 1000, NULL);
 
+
     // Get current time via API
-//    update_time();
+    update_time();
 
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
