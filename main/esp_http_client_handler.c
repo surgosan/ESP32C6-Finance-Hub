@@ -122,9 +122,9 @@ char (*fetch_time())[32] {
             .event_handler = time_handler,
             .transport_type = HTTP_TRANSPORT_OVER_SSL,
             .cert_pem = time_api_pem,
-            .skip_cert_common_name_check = false,
+            .skip_cert_common_name_check = true,
             .method = HTTP_METHOD_GET,
-            .timeout_ms = 2000,
+            .timeout_ms = 10000,
             .keep_alive_enable = true
     };
 

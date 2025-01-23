@@ -22,6 +22,8 @@
 #include "env.h"
 
 #define BOOT_BUTTON_PIN GPIO_NUM_9
+#define SCROLL_UP_BUTTON GPIO_NUM_10
+#define SCROLL_DOWN_BUTTON GPIO_NUM_11
 
 #define BL 15
 #define SCK 6
@@ -35,37 +37,55 @@
 static const char *TAG = "Plaid API";
 
 // ------------------------------------------ LVGL Objects ------------------------------------------
-// Declare buffer as a global variable
+// Screen Buffers & Panel Handle
 static uint16_t buffer[240 * 20];
 static uint16_t buffer2[240 * 20];
 static esp_lcd_panel_handle_t panel_handle;
 
-static bool data_loaded = false;
+// Booleans
+static bool data_loaded = true;
 
+// Pages
 static lv_obj_t* loading_screen;
 static lv_obj_t *home_page;
 static lv_obj_t *accounts_page;
 static lv_obj_t *transactions_page;
 static uint8_t page_number = 0;
 
+// Pages Content
+lv_obj_t *account_content;
+
+// Nav Buttons
 static lv_obj_t* home_button_label;
 static lv_obj_t* accounts_button_label;
 static lv_obj_t* transactions_button_label;
 
+// Counter
 static lv_obj_t *counter_label;
 static int counter = 0;
 
+// Time API
 static lv_obj_t *time_label;
 
+// Styles
 static lv_style_t bar_style_bg;
 static lv_style_t bar_style_indic;
 static lv_style_t nav_style;
 static lv_style_t menu_style;
 static lv_style_t menu_button_style;
+static lv_style_t table_style;
 
+// Nav Bar
 static lv_obj_t *nav_bar;
 static lv_obj_t *api_progress_label;
 static lv_color_t deselected;
+
+// Account Tables
+static lv_obj_t* checking_table;
+static lv_obj_t* credit_table;
+static uint8_t num_of_checking_accounts = 0;
+static uint8_t num_of_credit_accounts = 0;
+
 // -----------------------------------------  API Functions  ------------------------------------------
 
 // Updates time label
@@ -75,6 +95,7 @@ void update_time() {
     vTaskDelay(pdMS_TO_TICKS(100));
     sprintf(displayString, "%s\n%s", time_api[0], time_api[1]);
     lv_label_set_text(time_label, displayString);
+    lv_bar_set_value(api_progress_label, 50, LV_ANIM_ON);
 }
 // ------------------------------------------ LVGL Functions ------------------------------------------
 // Gets the amount of time since system startup in ms
@@ -103,7 +124,7 @@ static void clear_loading_screen() {
 _Noreturn void lvgl_task() {
     while(true) {
         lv_timer_handler();
-        vTaskDelay(pdMS_TO_TICKS(60));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
 }
 
@@ -141,7 +162,38 @@ _Noreturn void next_page() {
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+int lastScrollUpState = 1;
+int lastScrollDownState = 1;
+// Reads GPIO 10 & 11 for scrolling up & down on certain pages
+_Noreturn void scroll_ux() {
+    while(true) {
+        if(data_loaded) { // Once data has loaded, check button states with debouncing
+            int scroll_up_state = gpio_get_level(SCROLL_UP_BUTTON);
+            int scroll_down_state = gpio_get_level(SCROLL_DOWN_BUTTON);
+            // If either scroll up/down states are different from last recorded
+            if(scroll_up_state != lastScrollUpState || scroll_down_state != lastScrollDownState) {
+                vTaskDelay(pdMS_TO_TICKS(50)); // Delay
+                // Both start at logical state 1 (pull-up), so check if they are at 0
+                if(scroll_up_state == gpio_get_level(SCROLL_UP_BUTTON) && scroll_up_state == 0) {
+                    if(lv_screen_active() == accounts_page) {
+                        if(lv_obj_get_scroll_top(account_content) > 0) {
+                            lv_obj_scroll_by(account_content, 0, 80, LV_ANIM_ON);
+                        }
+                    }
+                } else if(scroll_down_state == gpio_get_level(SCROLL_DOWN_BUTTON) && scroll_down_state == 0) {
+                    if(lv_screen_active() == accounts_page) {
+                        lv_obj_scroll_by(account_content, 0, -80, LV_ANIM_ON);
+                    }
+                }
+            }
+            lastScrollUpState = scroll_up_state;
+            lastScrollDownState = scroll_down_state;
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
     }
 }
 
@@ -157,6 +209,26 @@ void app_main(void) {
             .intr_type = GPIO_INTR_DISABLE
     };
     gpio_config(&io_conf);
+
+    // Scroll Up GPIO Configuration
+    gpio_config_t scroll_up_config = {
+            .pin_bit_mask = (1ULL << SCROLL_UP_BUTTON),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&scroll_up_config);
+
+    // Scroll Down GPIO Configuration
+    gpio_config_t scroll_down_config = {
+            .pin_bit_mask = (1ULL << SCROLL_DOWN_BUTTON),
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_ENABLE,
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .intr_type = GPIO_INTR_DISABLE
+    };
+    gpio_config(&scroll_down_config);
 // -------------------------------------------  NVS  ---------------------------------------------
     esp_err_t ret = nvs_flash_init();
     if(ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -399,7 +471,7 @@ void app_main(void) {
 
     // Credit Cards Balance
     lv_obj_t *total_credit_balance_label = lv_label_create(home_page);
-    lv_label_set_text(total_credit_balance_label, LV_SYMBOL_WIFI " Credit");
+    lv_label_set_text(total_credit_balance_label, LV_SYMBOL_WIFI " Credit...");
     lv_obj_set_style_text_color(total_credit_balance_label, lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(total_credit_balance_label, LV_ALIGN_LEFT_MID, 20, 0);
     lv_obj_set_style_text_align(total_credit_balance_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
@@ -407,21 +479,99 @@ void app_main(void) {
 
     // Checking Accounts Balance
     lv_obj_t *total_checking_balance_label = lv_label_create(home_page);
-    lv_label_set_text(total_checking_balance_label, LV_SYMBOL_WIFI " Checking");
+    lv_label_set_text(total_checking_balance_label, LV_SYMBOL_WIFI " Checking...");
     lv_obj_set_style_text_color(total_checking_balance_label, lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(total_checking_balance_label, LV_ALIGN_RIGHT_MID, -20, 0);
     lv_obj_set_style_text_align(total_checking_balance_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
+
+    // Total Balance
+    lv_obj_t *total_balance = lv_label_create(home_page);
+    lv_label_set_text(total_balance, LV_SYMBOL_WIFI " Total Balance...");
+    lv_obj_align(total_balance, LV_ALIGN_BOTTOM_MID, 0, -40);
+    lv_obj_set_style_text_align(total_balance, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+    lv_obj_set_style_text_color(total_balance, lv_color_hex(0xffffff), LV_PART_MAIN);
 //--------------------------------------------------------------------  ACCOUNTS SCREEN  --------------------------------------------------------------------
     // Create accounts screen
     accounts_page = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(accounts_page, lv_color_hex(0x000000), LV_PART_MAIN);
 
-// Counter label
-    lv_obj_t *accounts_label = lv_label_create(accounts_page);
-    lv_label_set_text(accounts_label, "Accounts Page");
-    lv_obj_set_style_text_color(accounts_label, lv_color_hex(0xffffff), LV_PART_MAIN);
-    lv_obj_align(accounts_label, LV_ALIGN_TOP_MID, 0, 45);
+    // Account page div
+    account_content = lv_obj_create(accounts_page);
+    lv_obj_set_size(account_content, 320, 190);
+    lv_obj_set_style_bg_opa(account_content, LV_OPA_0, LV_PART_MAIN);
+    lv_obj_set_style_text_color(account_content, lv_color_hex(0x000000), 0);
+    lv_obj_set_style_border_width(account_content, 0, 0);
+    lv_obj_set_style_outline_width(account_content, 0, 0);
+    lv_obj_set_style_shadow_width(account_content, 0, 0);
+    lv_obj_set_style_pad_all(account_content, 0, 0);
+    lv_obj_align(account_content, LV_ALIGN_TOP_MID, 0, 50);
+//    lv_obj_set_layout(account_content, LV_LAYOUT_FLEX);
+//    lv_obj_set_flex_flow(account_content, LV_FLEX_FLOW_COLUMN);
+//    lv_obj_set_flex_align(account_content, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
+
+    // Table Style
+    lv_style_init(&table_style);
+    lv_style_set_pad_all(&table_style, 0);
+    lv_style_set_radius(&table_style, 0);
+    lv_style_set_size(&table_style, 310, 60);
+    lv_style_set_bg_opa(&table_style, LV_OPA_0);
+//    lv_style_set_bg_color(&table_style, lv_color_make(0,255,0));
+    lv_style_set_border_width(&table_style, 0);
+    lv_style_set_outline_width(&table_style, 0);
+    lv_style_set_shadow_width(&table_style, 0);
+    lv_style_set_text_color(&table_style, lv_color_hex(0x000000));
+
+    // Checking Table
+    checking_table = lv_table_create(account_content);
+    lv_table_set_column_count(checking_table, 2);
+    lv_table_set_row_count(checking_table, 1);
+    lv_table_set_column_width(checking_table, 0, 180);
+    lv_table_set_column_width(checking_table, 1, 120);
+    // Cell Styling
+    lv_obj_set_style_bg_color(checking_table, lv_color_make(0,255,50), LV_PART_ITEMS);
+    lv_obj_set_style_border_color(checking_table, lv_color_hex(0x000000), LV_PART_ITEMS);
+    lv_obj_set_style_border_width(checking_table, 1, LV_PART_ITEMS);
+    // Style for table
+    lv_obj_add_style(checking_table, &table_style, 0);
+    lv_table_set_cell_value(checking_table, 0, 0, "Checking Account");
+    lv_table_set_cell_value(checking_table, 0, 1, "Balance");
+    // Item text color
+    lv_obj_set_style_text_color(checking_table, lv_color_hex(0x000000), LV_PART_ITEMS);
+//    lv_obj_set_layout(checking_table, LV_LAYOUT_FLEX);          // Flex
+//    lv_obj_set_flex_flow(checking_table, LV_FLEX_FLOW_ROW);     // Flex-direction
+//    lv_obj_set_flex_align(checking_table, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER); // flex-align
+    lv_obj_set_style_pad_row(checking_table, 5, 0);
+    lv_obj_align(checking_table, LV_ALIGN_TOP_MID, 0, 0);
+/*
+
+    // Spacer
+    lv_obj_t *account_content_spacer = lv_obj_create(account_content);
+    lv_obj_set_size(account_content_spacer, 320, 40);
+    lv_obj_set_style_border_width(account_content_spacer, 0, 0);
+//    lv_obj_set_style_bg_color(account_content_spacer, lv_color_hex(0x000000), LV_PART_MAIN);
+//    lv_obj_align(account_content_spacer, LV_ALIGN_TOP_MID, 0, lv_obj_get_height(checking_table));
+    lv_obj_align_to(account_content_spacer, checking_table, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+*/
+
+    // Credit Table
+    credit_table = lv_table_create(account_content);
+    lv_table_set_column_count(credit_table, 2);
+    lv_table_set_row_count(credit_table, 1);
+    lv_table_set_column_width(credit_table, 0, 180);
+    lv_table_set_column_width(credit_table, 1, 120);
+    lv_obj_set_style_bg_color(credit_table, lv_color_make(14,14,28), LV_PART_ITEMS);
+    lv_obj_set_style_border_color(credit_table, lv_color_hex(0x000000), LV_PART_ITEMS);
+    lv_obj_set_style_border_width(credit_table, 1, LV_PART_ITEMS);
+    lv_obj_add_style(credit_table, &table_style, 0);
+    lv_table_set_cell_value(credit_table, 0, 0, "Credit Account");
+    lv_table_set_cell_value(credit_table, 0, 1, "Balance");
+    lv_obj_set_style_text_color(credit_table, lv_color_hex(0x000000), LV_PART_ITEMS);
+//    lv_obj_set_layout(credit_table, LV_LAYOUT_FLEX);            // Flex
+//    lv_obj_set_flex_flow(credit_table, LV_FLEX_FLOW_ROW);       // Flex-direction
+//    lv_obj_set_flex_align(credit_table, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER); // flex-align
+    lv_obj_set_style_pad_row(credit_table, 5, 0);
+//    lv_obj_align(credit_table, LV_ALIGN_TOP_MID, 0, (lv_obj_get_height(checking_table) + lv_obj_get_height(account_content_spacer)));
 
 //------------------------------------------------------------------  TRANSACTIONS SCREEN  ------------------------------------------------------------------
     transactions_page = lv_obj_create(NULL);
@@ -444,6 +594,7 @@ void app_main(void) {
     // Call lvgl_task to run indefinitely
     xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 1, NULL, 0);
     xTaskCreatePinnedToCore(next_page, "Next Page", 2048, NULL, 1, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(scroll_ux, "Scroll UX", 2040, NULL, 1, NULL, tskNO_AFFINITY);
 
 
 // --------------------------------------------  Plaid  --------------------------------------------
@@ -466,10 +617,10 @@ void app_main(void) {
         // Visual update on API progress
         switch(i) {
             case 0:
-                lv_bar_set_value(api_progress_label, 33, LV_ANIM_ON);
+                lv_bar_set_value(api_progress_label, 50, LV_ANIM_ON);
                 break;
             case 1:
-                lv_bar_set_value(api_progress_label, 66, LV_ANIM_ON);
+                lv_bar_set_value(api_progress_label, 75, LV_ANIM_ON);
                 break;
             case 2:
                 lv_bar_set_value(api_progress_label, 100, LV_ANIM_ON);
@@ -495,15 +646,42 @@ void app_main(void) {
                         // Define account name and balance as appropriate variable types
                         const char* account_name = cJSON_GetStringValue(current_account);
                         double balance_double = current_balance->valuedouble;
+                        // Save balance as string temporarily
+                        char balance_str_temp[32];
+                        sprintf(balance_str_temp, "$%.2f", balance_double);
 
-                        // If it is a checking account, add to checking total, else add to credit total
+                        /*
+                            If it is a checking account, add to checking total, else add to credit total.
+                            Also add to accounts table based on checking or credit
+                        */
                         if(strcmp(account_name, "Advantage Savings") == 0 ||
                                 strcmp(account_name, "Rewards Checking") == 0 ||
                                 strcmp(account_name, "Adv Plus Banking") == 0) {
-                            total_checking_balance += balance_double;
+                            total_checking_balance += balance_double; // Add balance to checking balance
+
+                            // Account page data
+                            num_of_checking_accounts++;
+                            // Num of checking accounts plus 1 (the title row)
+                            lv_table_set_row_count(checking_table, (num_of_checking_accounts+1));
+
+                            // Set data for new row
+                            lv_table_set_cell_value(checking_table, num_of_checking_accounts, 0, account_name);
+                            lv_table_set_cell_value(checking_table, num_of_checking_accounts, 1, balance_str_temp);
                         } else {
-                            total_credit_balance += balance_double;
+                            total_credit_balance += balance_double; // Add balance to credit balance
+                            //Account page data
+                            num_of_credit_accounts++;
+                            // Num of credit accounts plus 1 (title row)
+                            lv_table_set_row_count(credit_table, (num_of_credit_accounts+1));
+
+                            // Set data for new row
+                            lv_table_set_cell_value(credit_table, num_of_credit_accounts, 0, account_name);
+                            lv_table_set_cell_value(credit_table, num_of_credit_accounts, 1, balance_str_temp);
                         }
+                        // Update table sizes
+                        lv_obj_set_size(checking_table, 310, LV_SIZE_CONTENT);
+                        lv_obj_set_size(credit_table, 310, LV_SIZE_CONTENT);
+                        lv_obj_align_to(credit_table, checking_table, LV_ALIGN_OUT_BOTTOM_MID, 0, 15);
                     } else {
                         ESP_LOGW(TAG, "Invalid Response");
                     }
@@ -521,8 +699,12 @@ void app_main(void) {
     lv_label_set_text(total_credit_balance_label, total_credit_balance_string);
 
     char total_checking_balance_string[32];
-    sprintf(total_checking_balance_string, "Checking Balance\n$%.f", total_checking_balance);
+    sprintf(total_checking_balance_string, "Checking Balance\n$%.2f", total_checking_balance);
     lv_label_set_text(total_checking_balance_label, total_checking_balance_string);
+
+    char total_balance_calc_string[32];
+    sprintf(total_balance_calc_string, "Total Balance\n$%.2f", total_checking_balance - total_credit_balance);
+    lv_label_set_text(total_balance, total_balance_calc_string);
 
     // Create a one-shot timer with a 5-second delay
     TimerHandle_t bar_deletion_timer = xTimerCreate(
@@ -536,4 +718,5 @@ void app_main(void) {
     if(bar_deletion_timer != NULL) { xTimerStart(bar_deletion_timer, 0); }
 
     // From here, the _Noreturn void lvgl_task() will run until the system is powered off.
+//    clear_loading_screen();
 }
